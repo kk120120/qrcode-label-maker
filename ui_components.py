@@ -57,30 +57,35 @@ class PropertyPanel(QWidget):
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
         
+        # 对象信息标签
+        self.object_info_label = QLabel("未选择对象")
+        self.object_info_label.setStyleSheet("font-weight: bold; color: #4CAF50;")
+        self.layout.addWidget(self.object_info_label)
+        
         # 基本属性
         self.basic_group = QGroupBox("基本属性")
         self.basic_layout = QGridLayout()
         self.basic_group.setLayout(self.basic_layout)
         
         self.x_label = QLabel("X坐标 (mm):")
-        self.x_input = QSpinBox()
+        self.x_input = QDoubleSpinBox()
         self.x_input.setRange(0, 200)
-        self.x_input.setSingleStep(1)
+        self.x_input.setSingleStep(0.1)
         
         self.y_label = QLabel("Y坐标 (mm):")
-        self.y_input = QSpinBox()
+        self.y_input = QDoubleSpinBox()
         self.y_input.setRange(0, 200)
-        self.y_input.setSingleStep(1)
+        self.y_input.setSingleStep(0.1)
         
         self.width_label = QLabel("宽度 (mm):")
-        self.width_input = QSpinBox()
+        self.width_input = QDoubleSpinBox()
         self.width_input.setRange(2, 200)
-        self.width_input.setSingleStep(1)
+        self.width_input.setSingleStep(0.1)
         
         self.height_label = QLabel("高度 (mm):")
-        self.height_input = QSpinBox()
+        self.height_input = QDoubleSpinBox()
         self.height_input.setRange(2, 200)
-        self.height_input.setSingleStep(1)
+        self.height_input.setSingleStep(0.1)
         
         self.basic_layout.addWidget(self.x_label, 0, 0)
         self.basic_layout.addWidget(self.x_input, 0, 1)
@@ -202,6 +207,9 @@ class PropertyPanel(QWidget):
         self.text_layout.addWidget(self.text_csv_column_combo, 6, 1)
         
         self.layout.addWidget(self.text_group)
+        
+        # 默认隐藏文本属性面板
+        self.text_group.setVisible(False)
         
         # 保存按钮
         self.save_button = QPushButton("保存")
@@ -407,9 +415,8 @@ class BatchExportDialog(QDialog):
         folder_layout.addWidget(self.folder_input)
         folder_layout.addWidget(self.folder_button)
         
-        # 进度条
-        self.progress = QProgressDialog("正在生成标签...", "取消", 0, 100, self)
-        self.progress.setWindowTitle("批量生成")
+        # 进度条 - 初始化为None，在点击开始后创建
+        self.progress = None
         
         # 按钮
         button_layout = QHBoxLayout()

@@ -51,20 +51,94 @@ class ImageProcessor:
         # 转换mm为像素
         x_px = int(x * dpi / 25.4)
         y_px = int(y * dpi / 25.4)
-        font_size_px = int(font_size * dpi / 25.4)
+        width_px = int(width * dpi / 25.4)
+        height_px = int(height * dpi / 25.4)
+        
+        # 增大字体大小，确保文字清晰可见
+        font_size_px = int(font_size * dpi / 25.4 * 1.5)
         
         # 创建绘图对象
         draw = ImageDraw.Draw(label_img)
         
-        # 尝试加载字体
-        try:
-            font = ImageFont.truetype(font_name, font_size_px)
-        except:
-            # 如果字体不存在，使用默认字体
+        # 确保文本是字符串类型，并处理utf8with bom格式
+        text = str(text)
+        # 移除可能存在的BOM标记
+        if text.startswith('\ufeff'):
+            text = text[1:]
+        
+        # 尝试加载字体，确保支持utf-8
+        font = None
+        
+        # 1. 尝试使用系统中可能存在的中文字体路径
+        # 常见的中文字体路径
+        font_paths = [
+            'C:/Windows/Fonts/simhei.ttf',  # SimHei
+            'C:/Windows/Fonts/msyh.ttf',    # Microsoft YaHei
+            'C:/Windows/Fonts/msyhbd.ttf',  # Microsoft YaHei Bold
+            'C:/Windows/Fonts/simsun.ttc',   # SimSun
+        ]
+        
+        for font_path in font_paths:
+            try:
+                font = ImageFont.truetype(font_path, font_size_px)
+                break
+            except:
+                continue
+        
+        # 2. 如果找不到系统字体，尝试使用字体名称
+        if font is None:
+            font_list = ['SimHei', 'Microsoft YaHei', 'Arial', 'Times New Roman']
+            for font_name_try in font_list:
+                try:
+                    font = ImageFont.truetype(font_name_try, font_size_px)
+                    break
+                except:
+                    continue
+        
+        # 3. 如果所有字体都加载失败，使用默认字体
+        if font is None:
             font = ImageFont.load_default()
         
+        # 处理文本自动换行
+        import textwrap
+        
+        # 处理文本自动换行，考虑中英文混合
+        lines = []
+        current_line = ""
+        
+        for char in text:
+            test_line = current_line + char
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            test_width = bbox[2] - bbox[0]
+            
+            if test_width <= width_px:
+                current_line = test_line
+            else:
+                # 如果当前行不为空，添加到行列表
+                if current_line:
+                    lines.append(current_line)
+                # 开始新行
+                current_line = char
+        
+        # 添加最后一行
+        if current_line:
+            lines.append(current_line)
+        
+        # 计算文本高度
+        # 行距为1.2倍字高
+        line_height = font_size_px * 1.2
+        total_text_height = len(lines) * line_height
+        
+        # 靠上对齐
+        start_y = y_px
+        
         # 绘制文本
-        draw.text((x_px, y_px), text, font=font, fill=color)
+        for i, line in enumerate(lines):
+            line_y = start_y + i * line_height
+            # 靠左对齐
+            line_x = x_px
+            draw.text((line_x, line_y), line, font=font, fill=color)
+        
         return label_img
     
     def save_label(self, label_img, filename):
@@ -97,7 +171,8 @@ class ImageProcessor:
                     qr_gen = QRGenerator()
                     qr_img = qr_gen.generate_qr(
                         content,
-                        obj['properties']['error_correction']
+                        obj['properties']['error_correction'],
+                        obj['properties']['qr_version']
                     )
                     label_img = self.add_qr_to_label(
                         label_img, qr_img,
@@ -123,7 +198,8 @@ class ImageProcessor:
                     qr_gen = QRGenerator()
                     qr_img = qr_gen.generate_qr(
                         obj['properties']['content'],
-                        obj['properties']['error_correction']
+                        obj['properties']['error_correction'],
+                        obj['properties']['qr_version']
                     )
                     label_img = self.add_qr_to_label(
                         label_img, qr_img,

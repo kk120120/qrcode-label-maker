@@ -16,7 +16,7 @@
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QPainter, QPen, QColor, QBrush, QPixmap
-from PyQt5.QtCore import Qt, QPoint, QRectF
+from PyQt5.QtCore import Qt, QPoint, QRectF, QTimer
 import sys
 import os
 
@@ -68,8 +68,9 @@ class LabelDesigner(QWidget):
         
         # 绘制对象
         out_of_bounds = self.template.check_boundaries()
+        objects = self.template.get_objects()
         
-        for obj in self.template.get_objects():
+        for i, obj in enumerate(objects):
             x = int(obj['position']['x'] * scale + x_offset)
             y = int(obj['position']['y'] * scale + y_offset)
             width = int(obj['size']['width'] * scale)
@@ -88,6 +89,12 @@ class LabelDesigner(QWidget):
             
             painter.setBrush(QBrush(QColor(240, 240, 240, 100)))
             painter.drawRect(x, y, width, height)
+            
+            # 绘制对象类型简称和序号
+            obj_type = "QR" if obj['type'] == 'qr' else "Text"
+            obj_name = f"{obj_type} #{i+1}"
+            painter.setPen(QPen(QColor(255, 0, 0), 1))
+            painter.drawText(int(x + 5), int(y - 5), obj_name)
             
             # 绘制对象内容
             painter.setPen(QPen(QColor(0, 0, 0), 1))
@@ -128,33 +135,59 @@ class LabelDesigner(QWidget):
             y_offset = (self.height() - label_height * scale) / 2
             
             # 检查是否点击了对象
-            for obj in reversed(self.template.get_objects()):
+            clicked_obj = None
+            objects = self.template.get_objects()
+            # 从后往前遍历，确保上层对象先被检测
+            for i in reversed(range(len(objects))):
+                obj = objects[i]
                 x = int(obj['position']['x'] * scale + x_offset)
                 y = int(obj['position']['y'] * scale + y_offset)
                 width = int(obj['size']['width'] * scale)
                 height = int(obj['size']['height'] * scale)
                 
+                # 创建矩形区域
                 rect = QRectF(x, y, width, height)
+                # 检查鼠标是否在矩形内
                 if rect.contains(event.pos()):
-                    self.selected_object = obj['id']
-                    self.is_dragging = True
-                    self.drag_start = event.pos()
-                    self.update()
-                    # 通知主窗口更新属性面板
-                    if hasattr(self.parent(), 'update_property_panel'):
-                        self.parent().update_property_panel()
-                    return
+                    clicked_obj = obj
+                    break
             
-            # 未点击对象，取消选择
-            self.selected_object = None
-            self.update()
-            # 通知主窗口更新属性面板
-            if hasattr(self.parent(), 'update_property_panel'):
-                self.parent().update_property_panel()
+            if clicked_obj:
+                # 设置选中对象
+                self.selected_object = clicked_obj['id']
+                # 暂时不设置is_dragging，只有在鼠标移动时才设置
+                self.drag_start = event.pos()
+                # 强制重绘
+                self.update()
+                # 通知主窗口更新属性面板
+                
+                # 直接调用主窗口的update_property_panel方法
+                if self.parent() and hasattr(self.parent(), 'update_property_panel'):
+                    self.parent().update_property_panel()
+                    # 再次强制更新，确保属性面板正确显示
+                    QTimer.singleShot(100, lambda: self.parent().update_property_panel())
+                else:
+                    # 尝试通过其他方式获取主窗口
+                    main_window = self.window()
+                    if main_window and hasattr(main_window, 'update_property_panel'):
+                        main_window.update_property_panel()
+                        QTimer.singleShot(100, lambda: main_window.update_property_panel())
+            else:
+                # 未点击对象，取消选择
+                self.selected_object = None
+                # 强制重绘
+                self.update()
+                # 通知主窗口更新属性面板
+                if hasattr(self.parent(), 'update_property_panel'):
+                    self.parent().update_property_panel()
     
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
-        if self.is_dragging and self.selected_object:
+        if self.selected_object:
+            # 如果是首次移动，设置is_dragging为True
+            if not self.is_dragging:
+                self.is_dragging = True
+            
             # 计算缩放比例
             label_width = self.template.template['label_size']['width']
             label_height = self.template.template['label_size']['height']
@@ -167,14 +200,19 @@ class LabelDesigner(QWidget):
             # 更新对象位置
             obj = self.template.get_object(self.selected_object)
             if obj:
-                new_x = int(obj['position']['x'] + delta_x)
-                new_y = int(obj['position']['y'] + delta_y)
+                new_x = obj['position']['x'] + delta_x
+                new_y = obj['position']['y'] + delta_y
                 self.template.update_object(self.selected_object, x=new_x, y=new_y)
                 self.drag_start = event.pos()
                 
                 # 在状态栏显示当前坐标
                 if hasattr(self.parent(), 'statusBar'):
-                    self.parent().statusBar.showMessage(f"坐标: X={new_x} mm, Y={new_y} mm")
+                    self.parent().statusBar.showMessage(f"坐标: X={new_x:.2f} mm, Y={new_y:.2f} mm")
+                
+                # 实时更新属性面板中的位置信息
+                if hasattr(self.parent(), 'property_panel'):
+                    self.parent().property_panel.x_input.setValue(new_x)
+                    self.parent().property_panel.y_input.setValue(new_y)
                 
                 self.update()
     
@@ -194,7 +232,7 @@ class LabelDesigner(QWidget):
         if self.selected_object:
             obj = self.template.get_object(self.selected_object)
             if obj:
-                step = 1  # 微调步长，使用整数
+                step = 0.1  # 微调步长，使用小数以支持更精细的调整
                 if event.key() == Qt.Key.Key_Left:
                     new_x = obj['position']['x'] - step
                     self.template.update_object(self.selected_object, x=new_x)
@@ -330,6 +368,13 @@ class MainWindow(QMainWindow):
         delete_action.triggered.connect(self.delete_selected)
         edit_menu.addAction(delete_action)
         
+        # 帮助菜单
+        help_menu = menubar.addMenu("帮助")
+        
+        about_action = QAction("关于", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+        
         # 状态栏
         self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
@@ -372,6 +417,15 @@ class MainWindow(QMainWindow):
         self.property_panel.color_button.clicked.connect(self.on_color_button_clicked)
         self.property_panel.qr_version_combo.currentTextChanged.connect(self.on_qr_version_changed)
         self.property_panel.error_correction_combo.currentTextChanged.connect(self.on_error_correction_changed)
+        
+        # 为输入框添加回车键信号连接
+        self.property_panel.x_input.editingFinished.connect(self.on_save_properties)
+        self.property_panel.y_input.editingFinished.connect(self.on_save_properties)
+        self.property_panel.width_input.editingFinished.connect(self.on_save_properties)
+        self.property_panel.height_input.editingFinished.connect(self.on_save_properties)
+        self.property_panel.content_input.editingFinished.connect(self.on_save_properties)
+        self.property_panel.text_content_input.editingFinished.connect(self.on_save_properties)
+        self.property_panel.font_size_input.editingFinished.connect(self.on_save_properties)
     
     def open_basic_settings(self):
         """打开基础设置对话框"""
@@ -561,8 +615,50 @@ class MainWindow(QMainWindow):
     
     def update_property_panel(self):
         """更新属性面板"""
-        obj = self.designer.get_selected_object()
+        # 强制获取最新的选中对象
+        selected_id = self.designer.selected_object
+        
+        # 直接从模板中获取对象，而不是通过get_selected_object
+        objects = self.designer.template.get_objects()
+        
+        obj = None
+        for o in objects:
+            if o['id'] == selected_id:
+                obj = o
+                break
+        
         if obj:
+            # 查找对象在列表中的索引
+            obj_index = -1
+            for i, o in enumerate(objects):
+                if o['id'] == obj['id']:
+                    obj_index = i + 1  # 从1开始编号
+                    break
+            
+            # 更新对象信息标签
+            obj_type = "QR" if obj['type'] == 'qr' else "Text"
+            self.property_panel.object_info_label.setText(f"选中对象: {obj_type} #{obj_index}")
+            
+            # 强制隐藏所有属性面板，然后再显示正确的面板
+            self.property_panel.qr_group.setVisible(False)
+            self.property_panel.text_group.setVisible(False)
+            
+            # 强制重新布局
+            self.property_panel.layout.update()
+            self.property_panel.layout.activate()
+            
+            # 确保显示正确的属性面板
+            if obj['type'] == 'qr':
+                self.property_panel.qr_group.setVisible(True)
+                self.property_panel.text_group.setVisible(False)
+            else:
+                self.property_panel.qr_group.setVisible(False)
+                self.property_panel.text_group.setVisible(True)
+            
+            # 再次强制重新布局
+            self.property_panel.layout.update()
+            self.property_panel.layout.activate()
+            
             # 更新基本属性
             self.property_panel.x_input.setValue(obj['position']['x'])
             self.property_panel.y_input.setValue(obj['position']['y'])
@@ -570,7 +666,6 @@ class MainWindow(QMainWindow):
             self.property_panel.height_input.setValue(obj['size']['height'])
             
             if obj['type'] == 'qr':
-                self.property_panel.show_qr_properties()
                 # 更新二维码属性
                 self.property_panel.qr_version_combo.setCurrentText(obj['properties']['qr_version'])
                 self.property_panel.error_correction_combo.setCurrentText(obj['properties']['error_correction'])
@@ -589,7 +684,6 @@ class MainWindow(QMainWindow):
                     obj['properties']['error_correction']
                 )
             elif obj['type'] == 'text':
-                self.property_panel.show_text_properties()
                 # 更新文本属性
                 self.property_panel.font_combo.setCurrentText(obj['properties']['font'])
                 self.property_panel.font_size_input.setValue(obj['properties']['font_size'])
@@ -609,11 +703,17 @@ class MainWindow(QMainWindow):
                 self.property_panel.update_csv_columns(columns)
                 if obj['properties']['csv_column'] in columns:
                     self.property_panel.text_csv_column_combo.setCurrentText(obj['properties']['csv_column'])
+        else:
+            # 未选择对象时更新标签
+            self.property_panel.object_info_label.setText("未选择对象")
+            # 隐藏所有属性面板
+            self.property_panel.qr_group.setVisible(False)
+            self.property_panel.text_group.setVisible(False)
     
     def on_batch_checkbox_changed(self, state):
         """批量生成复选框变化"""
         try:
-            if state == Qt.CheckState.Checked.value:
+            if state == Qt.CheckState.Checked:
                 # 检查是否已导入CSV
                 if not self.csv_handler.get_columns():
                     QMessageBox.warning(self, "提示", "请先导入CSV文件")
@@ -629,11 +729,11 @@ class MainWindow(QMainWindow):
             # 确保复选框状态正确
             self.property_panel.batch_checkbox.setChecked(False)
             self.property_panel.content_input.setEnabled(True)
-    
+
     def on_text_batch_checkbox_changed(self, state):
         """文本批量生成复选框变化"""
         try:
-            if state == Qt.CheckState.Checked.value:
+            if state == Qt.CheckState.Checked:
                 # 检查是否已导入CSV
                 if not self.csv_handler.get_columns():
                     QMessageBox.warning(self, "提示", "请先导入CSV文件")
@@ -740,24 +840,38 @@ class MainWindow(QMainWindow):
         template = self.designer.template.get_template()
         csv_data = self.csv_handler.get_data()
         
+        # 创建并显示进度条 - 判定条件是output_dir不为空
+        from PyQt5.QtWidgets import QProgressDialog, QApplication
+        if output_dir is not None:
+            dialog.progress = QProgressDialog("正在生成标签...", "取消", 0, len(csv_data), self)
+        else:
+            dialog.progress = QProgressDialog("正在生成标签...", "取消", 0, 100, self)
+        
+        dialog.progress.setWindowTitle("批量生成")
+        dialog.progress.show()
+        QApplication.processEvents()  # 确保进度窗及时显示
+        
+        # 批量处理
+        results = self.image_processor.batch_process(template, csv_data, output_dir)
+        
+        # 完成
         if csv_data is not None:
-            # 更新进度条
-            dialog.progress.setMaximum(len(csv_data))
-            dialog.progress.show()
-            
-            # 批量处理
-            results = self.image_processor.batch_process(template, csv_data, output_dir)
-            
-            # 完成
             dialog.progress.setValue(len(csv_data))
-            QMessageBox.information(self, "完成", f"已生成 {len(results)} 个标签")
-            dialog.accept()
-            self.statusBar.showMessage(f"批量导出完成，生成 {len(results)} 个标签")
+        else:
+            dialog.progress.setValue(100)
+        QApplication.processEvents()  # 确保进度条更新
+        QMessageBox.information(self, "完成", f"已生成 {len(results)} 个标签")
+        dialog.accept()
+        self.statusBar.showMessage(f"批量导出完成，生成 {len(results)} 个标签")
     
     def resizeEvent(self, event):
         """窗口大小变化事件"""
         super().resizeEvent(event)
         # 主窗口大小变化时，设计器会自动更新，因为它已经有了resizeEvent处理
+    
+    def show_about(self):
+        """显示关于对话框"""
+        QMessageBox.information(self, "关于", f"Python 批量二维码标签生成器\n版本：V0.7.1\t2026-04-06\n作者：kk120120\n邮箱：hzwtox@hotmail.com\n\nCopyright (C) 2026\n\nThis program is free software: you can redistribute it and/or modify\nit under the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

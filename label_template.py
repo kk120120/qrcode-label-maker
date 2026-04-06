@@ -32,9 +32,9 @@ class LabelTemplate:
     
     def set_label_size(self, width, height, corner_radius):
         """设置标签尺寸"""
-        self.template['label_size']['width'] = int(width)
-        self.template['label_size']['height'] = int(height)
-        self.template['label_size']['corner_radius'] = int(corner_radius)
+        self.template['label_size']['width'] = width
+        self.template['label_size']['height'] = height
+        self.template['label_size']['corner_radius'] = corner_radius
     
     def set_dpi(self, dpi):
         """设置DPI"""
@@ -49,12 +49,12 @@ class LabelTemplate:
             "type": "qr",
             "id": str(uuid.uuid4()),
             "position": {
-                "x": int(x),
-                "y": int(y)
+                "x": x,
+                "y": y
             },
             "size": {
-                "width": int(width),
-                "height": int(height)
+                "width": width,
+                "height": height
             },
             "properties": {
                 "qr_version": qr_version,
@@ -73,12 +73,12 @@ class LabelTemplate:
             "type": "text",
             "id": str(uuid.uuid4()),
             "position": {
-                "x": int(x),
-                "y": int(y)
+                "x": x,
+                "y": y
             },
             "size": {
-                "width": int(width),
-                "height": int(height)
+                "width": width,
+                "height": height
             },
             "properties": {
                 "font": font,
@@ -99,12 +99,12 @@ class LabelTemplate:
             if obj['id'] == obj_id:
                 # 更新位置
                 if 'x' in kwargs and 'y' in kwargs:
-                    obj['position']['x'] = int(kwargs['x'])
-                    obj['position']['y'] = int(kwargs['y'])
+                    obj['position']['x'] = kwargs['x']
+                    obj['position']['y'] = kwargs['y']
                 # 更新大小
                 if 'width' in kwargs and 'height' in kwargs:
-                    obj['size']['width'] = int(kwargs['width'])
-                    obj['size']['height'] = int(kwargs['height'])
+                    obj['size']['width'] = kwargs['width']
+                    obj['size']['height'] = kwargs['height']
                 # 更新属性
                 if 'properties' in kwargs:
                     obj['properties'].update(kwargs['properties'])
