@@ -30,8 +30,16 @@ jobs:
         run: |
           pyinstaller qr-label-creator.spec
 
+      - name: 创建 released 目录
+        run: |
+          New-Item -ItemType Directory -Path "released" -Force
+
+      - name: 复制打包文件到 released 目录
+        run: |
+          Copy-Item -Path "dist/*" -Destination "released/" -Recurse -Force
+
       - name: 上传生成的程序
         uses: actions/upload-artifact@v4
         with:
           name: QR-Label-Creator-Windows
-          path: dist/
+          path: released/
