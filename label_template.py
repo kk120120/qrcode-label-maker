@@ -98,12 +98,14 @@ class LabelTemplate:
         for obj in self.template['objects']:
             if obj['id'] == obj_id:
                 # 更新位置
-                if 'x' in kwargs and 'y' in kwargs:
+                if 'x' in kwargs:
                     obj['position']['x'] = kwargs['x']
+                if 'y' in kwargs:
                     obj['position']['y'] = kwargs['y']
                 # 更新大小
-                if 'width' in kwargs and 'height' in kwargs:
+                if 'width' in kwargs:
                     obj['size']['width'] = kwargs['width']
+                if 'height' in kwargs:
                     obj['size']['height'] = kwargs['height']
                 # 更新属性
                 if 'properties' in kwargs:
