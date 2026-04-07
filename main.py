@@ -15,10 +15,18 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QPainter, QPen, QColor, QBrush, QPixmap
+from PyQt5.QtGui import QPainter, QPen, QColor, QBrush, QPixmap, QFont
 from PyQt5.QtCore import Qt, QPoint, QRectF, QTimer
 import sys
 import os
+
+# 尝试导入PIL模块
+try:
+    from PIL import Image
+    from PIL.ImageQt import ImageQt
+except ImportError:
+    Image = None
+    ImageQt = None
 
 from ui_components import (
     DrawToolBar, PropertyPanel, BasicSettingsDialog, 
@@ -104,25 +112,60 @@ class LabelDesigner(QWidget):
                 error_correction = obj['properties'].get('error_correction', 'Q')
                 if content:
                     try:
+                        # 生成二维码
                         qr_img = self.qr_generator.generate_qr(content, error_correction)
-                        # 转换PIL图像为QPixmap
-                        from PIL.ImageQt import ImageQt
-                        qt_img = ImageQt(qr_img)
-                        pixmap = QPixmap.fromImage(qt_img)
-                        # 调整大小并绘制
-                        scaled_pixmap = pixmap.scaled(int(width), int(height), Qt.AspectRatioMode.KeepAspectRatio)
-                        painter.drawPixmap(int(x), int(y), scaled_pixmap)
+                        
+                        # 保存为临时文件
+                        import tempfile
+                        import os
+                        temp_fd, temp_file = tempfile.mkstemp(suffix='.png')
+                        os.close(temp_fd)
+                        
+                        qr_img.save(temp_file)
+                        
+                        # 使用QPixmap直接加载
+                        pixmap = QPixmap(temp_file)
+                        
+                        if not pixmap.isNull():
+                            # 调整大小并绘制
+                            scaled_pixmap = pixmap.scaled(int(width), int(height), Qt.AspectRatioMode.KeepAspectRatio)
+                            painter.drawPixmap(int(x), int(y), scaled_pixmap)
+                        else:
+                            painter.drawText(int(x + 5), int(y + 15), "QR: Load Error")
+                        
+                        # 清理临时文件
+                        try:
+                            os.unlink(temp_file)
+                        except:
+                            pass
                     except Exception as e:
-                        painter.drawText(int(x + 5), int(y + 15), "QR")
+                        painter.drawText(int(x + 5), int(y + 15), f"QR Error: {str(e)[:15]}")
                 else:
+                    # 没有内容时显示QR
                     painter.drawText(int(x + 5), int(y + 15), "QR")
             elif obj['type'] == 'text':
                 # 绘制文本内容预览
                 content = obj['properties'].get('content', '')
+                font = obj['properties'].get('font', 'Arial')
+                font_size = obj['properties'].get('font_size', 3)
+                font_style = obj['properties'].get('font_style', [])
+                
+                # 创建字体
+                qfont = QFont(font, int(font_size * scale))
+                if 'bold' in font_style:
+                    qfont.setBold(True)
+                if 'italic' in font_style:
+                    qfont.setItalic(True)
+                if 'underline' in font_style:
+                    qfont.setUnderline(True)
+                
+                painter.setFont(qfont)
+                
                 if content:
-                    painter.drawText(int(x + 5), int(y + 15), content[:20])  # 显示前20个字符
+                    # 绘制文本内容
+                    painter.drawText(int(x + 5), int(y + font_size * scale + 5), content[:20])  # 显示前20个字符
                 else:
-                    painter.drawText(int(x + 5), int(y + 15), "Text")
+                    painter.drawText(int(x + 5), int(y + font_size * scale + 5), "Text")
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
@@ -202,27 +245,36 @@ class LabelDesigner(QWidget):
             if obj:
                 new_x = obj['position']['x'] + delta_x
                 new_y = obj['position']['y'] + delta_y
-                self.template.update_object(self.selected_object, x=new_x, y=new_y)
+                
+                # 直接更新对象的位置，避免调用update_object方法
+                obj['position']['x'] = new_x
+                obj['position']['y'] = new_y
+                
+                # 更新drag_start
                 self.drag_start = event.pos()
                 
                 # 在状态栏显示当前坐标
                 if hasattr(self.parent(), 'statusBar'):
                     self.parent().statusBar.showMessage(f"坐标: X={new_x:.2f} mm, Y={new_y:.2f} mm")
                 
-                # 实时更新属性面板中的位置信息
-                if hasattr(self.parent(), 'property_panel'):
-                    self.parent().property_panel.x_input.setValue(new_x)
-                    self.parent().property_panel.y_input.setValue(new_y)
-                
+                # 只在需要时重绘
                 self.update()
-    
+
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = False
-            # 通知主窗口更新属性面板
-            if hasattr(self.parent(), 'update_property_panel'):
+            # 通知主窗口更新整个属性面板
+            if self.parent() and hasattr(self.parent(), 'update_property_panel'):
                 self.parent().update_property_panel()
+                # 再次强制更新，确保属性面板正确显示
+                QTimer.singleShot(100, lambda: self.parent().update_property_panel())
+            else:
+                # 尝试通过其他方式获取主窗口
+                main_window = self.window()
+                if main_window and hasattr(main_window, 'update_property_panel'):
+                    main_window.update_property_panel()
+                    QTimer.singleShot(100, lambda: main_window.update_property_panel())
             # 清除状态栏信息
             if hasattr(self.parent(), 'statusBar'):
                 self.parent().statusBar.clearMessage()
@@ -870,8 +922,7 @@ class MainWindow(QMainWindow):
         # 主窗口大小变化时，设计器会自动更新，因为它已经有了resizeEvent处理
     
     def show_about(self):
-        """显示关于对话框"""
-        QMessageBox.information(self, "关于", f"Python 批量二维码标签生成器\n版本：V0.7.1\t2026-04-06\n作者：kk120120\n邮箱：hzwtox@hotmail.com\n\nCopyright (C) 2026\n\nThis program is free software: you can redistribute it and/or modify\nit under the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.")
+        QMessageBox.information(self, "关于", f"Python 批量二维码标签生成器\n版本：V0.7.2\t2026-04-07\n作者：kk120120\n邮箱：hzwtox@hotmail.com\nGitHub：https://github.com/kk120120/qrcode-label-maker\n\nCopyright (C) 2026\n\nThis program is free software: you can redistribute it and/or modify\nit under the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -23,7 +23,12 @@ class ConfigManager:
         # 获取正确的配置文件路径
         if getattr(sys, 'frozen', False):
             # 打包后的exe环境
-            base_path = os.path.dirname(sys.executable)
+            if hasattr(sys, '_MEIPASS'):
+                # PyInstaller 打包后的临时目录
+                base_path = sys._MEIPASS
+            else:
+                # 备选路径
+                base_path = os.path.dirname(sys.executable)
             self.config_file = os.path.join(base_path, config_file)
         else:
             # 开发环境
