@@ -26,6 +26,12 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: 提取版本号
+        id: get_version
+        run: |
+          $version = (Select-String -Path "main.py" -Pattern 'VERSION = "(.*?)"').Matches.Groups[1].Value
+          echo "version=$version" >> $env:GITHUB_ENV
+
       - name: 用 spec 文件打包 EXE
         run: |
           pyinstaller qr-label-creator.spec
@@ -34,9 +40,15 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path "released" -Force
 
-      - name: 复制打包文件到 released 目录
+      - name: 复制并重命名打包文件到 released 目录
         run: |
-          Copy-Item -Path "dist/*" -Destination "released/" -Recurse -Force
+          $version = $env:version
+          $date = Get-Date -Format "yyyy.MM.dd"
+          $sourcePath = "dist\QR-Label-Creator"
+          $destPath = "released\qrcode-label-creator-$version-$date"
+          Copy-Item -Path $sourcePath -Destination $destPath -Recurse -Force
+          # 创建压缩包
+          Compress-Archive -Path $destPath -DestinationPath "released\qrcode-label-creator-$version-$date.zip" -Force
 
       - name: 上传生成的程序
         uses: actions/upload-artifact@v4
