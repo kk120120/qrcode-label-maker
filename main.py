@@ -15,8 +15,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # 版本信息
-VERSION = "v0.7.5"
-RELEASE_DATE = "2026-04-08"
+VERSION = "v0.7.8"
+RELEASE_DATE = "2026-04-09"
 AUTHOR = "kk120120"
 EMAIL = "hzwtox@hotmail.com"
 GITHUB = "https://github.com/kk120120/qrcode-label-maker"
@@ -455,7 +455,14 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Python 批量二维码标签生成器")
         self.setGeometry(100, 100, 1200, 800)
-        
+  
+        # 设置窗口图标
+        import os
+        icon_f = os.path.join(os.path.dirname(__file__), "icon_path/sw-icon.ico")
+        if os.path.exists(icon_f):
+            from PyQt5.QtGui import QIcon
+            self.setWindowIcon(QIcon(icon_f))      
+  
         # 初始化组件
         self.init_ui()
         
@@ -484,7 +491,7 @@ class MainWindow(QMainWindow):
         self.grid_action.setCheckable(True)
         self.grid_action.triggered.connect(self.toggle_grid)
         settings_menu.addAction(self.grid_action)
-        
+
         # 文件菜单
         file_menu = menubar.addMenu("文件")
         
@@ -605,7 +612,8 @@ class MainWindow(QMainWindow):
         self.property_panel.error_correction_combo.currentTextChanged.connect(self.on_error_correction_changed)
         
         # 初始化网格状态
-        self.designer.show_grid = False
+        self.designer.show_grid = True
+        self.grid_action.setChecked(True)
         
         # 文本样式复选框信号连接
         self.property_panel.bold_checkbox.stateChanged.connect(self.on_save_properties)

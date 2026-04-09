@@ -124,7 +124,7 @@
         
         <h2>1. 项目概述</h2>
         <p>本项目是一个用于生成批量二维码标签的工具，支持自定义标签大小、二维码属性和文本属性，并能通过CSV导入数据进行批量生成。</p>
-        <p><strong>版本：</strong>v0.7.5</p>
+        <p><strong>版本：</strong>v0.7.8</p>
         <p><strong>GitHub 项目地址：</strong><a href="https://github.com/kk120120/qrcode-label-maker" target="_blank">https://github.com/kk120120/qrcode-label-maker</a></p>
         
         <h2>2. 模块互动流程图</h2>
@@ -194,14 +194,22 @@
                 
                 <h4>主要方法：</h4>
                 <ul>
-                    <li><strong>init_ui()：</strong>初始化用户界面</li>
-                    <li><strong>open_basic_settings()：</strong>打开基础设置对话框</li>
+                    <li><strong>init_ui()：</strong>初始化用户界面，默认开启网格显示</li>
+                    <li><strong>open_basic_settings()：</strong>打开基础设置对话框，支持网格颜色设置</li>
                     <li><strong>on_qr_button_clicked()：</strong>处理二维码按钮点击事件</li>
                     <li><strong>on_text_button_clicked()：</strong>处理文本按钮点击事件</li>
                     <li><strong>on_save_properties()：</strong>保存对象属性</li>
                     <li><strong>update_property_panel()：</strong>更新属性面板</li>
                     <li><strong>export_current()：</strong>导出当前标签</li>
                     <li><strong>batch_export()：</strong>批量导出标签</li>
+                    <li><strong>show_about()：</strong>显示关于对话框，使用版本信息常量</li>
+                </ul>
+                
+                <h4>新增功能：</h4>
+                <ul>
+                    <li>默认开启绘图区网格显示</li>
+                    <li>添加“新建”菜单快捷键 Ctrl+N</li>
+                    <li>为应用程序窗口添加二维码样式图标</li>
                 </ul>
                 
                 <h4>触发条件：</h4>
@@ -224,7 +232,7 @@
                 
                 <h4>主要方法：</h4>
                 <ul>
-                    <li><strong>paintEvent()：</strong>绘制标签和对象，包括对象类型简称和序号</li>
+                    <li><strong>paintEvent()：</strong>绘制标签和对象，包括对象类型简称和序号，使用grid_color属性绘制网格</li>
                     <li><strong>mousePressEvent()：</strong>处理鼠标按下事件，更新选中对象和属性面板</li>
                     <li><strong>mouseMoveEvent()：</strong>处理鼠标移动事件，实现对象拖动</li>
                     <li><strong>mouseReleaseEvent()：</strong>处理鼠标释放事件</li>
@@ -232,6 +240,11 @@
                     <li><strong>add_qr_object()：</strong>添加二维码对象</li>
                     <li><strong>add_text_object()：</strong>添加文本对象</li>
                     <li><strong>update_object_properties()：</strong>更新对象属性</li>
+                </ul>
+                
+                <h4>新增属性：</h4>
+                <ul>
+                    <li><strong>grid_color：</strong>网格颜色，默认为QColor(180, 180, 180)</li>
                 </ul>
                 
                 <h4>触发条件：</h4>
@@ -401,7 +414,31 @@
             </ul>
         </div>
         
-        <h2>5. 版本差异（v0.7.5 vs v0.7.2）</h2>
+        <h2>5. 版本差异</h2>
+        
+        <h3>v0.7.8 vs v0.7.5</h3>
+        
+        <div class="optimization-log">
+            <h4>新增功能</h4>
+            <ul>
+                <li>默认开启绘图区网格显示</li>
+                <li>添加“新建”菜单快捷键 Ctrl+N</li>
+                <li>为应用程序窗口添加二维码样式图标</li>
+                <li>为打包的 exe 文件添加二维码样式图标</li>
+                <li>在基础设置中添加网格线颜色设置功能</li>
+            </ul>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>代码优化</h4>
+            <ul>
+                <li>在 main.py 文件开头添加版本信息常量</li>
+                <li>修改 show_about 方法，使用常量而不是硬编码值</li>
+                <li>修复 f-string 语法错误</li>
+            </ul>
+        </div>
+        
+        <h3>v0.7.5 vs v0.7.2</h3>
         
         <div class="optimization-log">
             <h3>新增功能</h3>

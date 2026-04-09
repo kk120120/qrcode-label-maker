@@ -49,10 +49,10 @@ jobs:
         run: |
           $version = $env:version
           $date = Get-Date -Format "yyyy.MM.dd"
-          $sourcePath = "dist\QR-Label-Creator"
-          $destPath = "released\qrcode-label-creator-$version-$date"
-          Copy-Item -Path $sourcePath -Destination $destPath -Recurse -Force
-          # 创建压缩包
+          $sourcePath = "dist\qr-label-creator.exe"
+          $destPath = "released\qrcode-label-creator-$version-$date.exe"
+          Copy-Item -Path $sourcePath -Destination $destPath -Force
+          # 创建压缩包（包含 exe 文件）
           Compress-Archive -Path $destPath -DestinationPath "released\qrcode-label-creator-$version-$date.zip" -Force
 
       - name: 提交 released 文件夹到仓库

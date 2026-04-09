@@ -245,7 +245,7 @@ class PropertyPanel(QWidget):
 
 class BasicSettingsDialog(QDialog):
     """基础设置对话框"""
-    def __init__(self, parent=None, label_size=None, dpi=None):
+    def __init__(self, parent=None, label_size=None, dpi=None, grid_color=None):
         super().__init__(parent)
         self.setWindowTitle("基础设置")
         self.setGeometry(200, 200, 400, 300)
@@ -300,7 +300,7 @@ class BasicSettingsDialog(QDialog):
         
         self.grid_color_label = QLabel("网格颜色:")
         self.grid_color_button = QPushButton("选择颜色")
-        self.grid_color = QColor(180, 180, 180)  # 默认为比淡灰色深一点的颜色
+        self.grid_color = grid_color if grid_color else QColor(180, 180, 180)  # 默认为比淡灰色深一点的颜色
         
         # 设置按钮样式以显示当前颜色
         def update_color_button():
@@ -331,6 +331,7 @@ class BasicSettingsDialog(QDialog):
         
         layout.addWidget(size_group)
         layout.addWidget(dpi_group)
+        layout.addWidget(grid_group)
         layout.addLayout(button_layout)
         
         # 初始化值
