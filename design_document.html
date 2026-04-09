@@ -124,7 +124,7 @@
         
         <h2>1. 项目概述</h2>
         <p>本项目是一个用于生成批量二维码标签的工具，支持自定义标签大小、二维码属性和文本属性，并能通过CSV导入数据进行批量生成。</p>
-        <p><strong>版本：</strong>v0.7.2</p>
+        <p><strong>版本：</strong>v0.7.5</p>
         <p><strong>GitHub 项目地址：</strong><a href="https://github.com/kk120120/qrcode-label-maker" target="_blank">https://github.com/kk120120/qrcode-label-maker</a></p>
         
         <h2>2. 模块互动流程图</h2>
@@ -401,7 +401,46 @@
             </ul>
         </div>
         
-        <h2>5. Bug和优化日志</h2>
+        <h2>5. 版本差异（v0.7.5 vs v0.7.2）</h2>
+        
+        <div class="optimization-log">
+            <h3>新增功能</h3>
+            <ul>
+                <li>添加网格显示功能，支持5mmx5mm的虚线网格</li>
+                <li>实现绘图区的放大缩小功能（Ctrl+鼠标滚轮），限制范围为30%-300%</li>
+                <li>实现绘图区的平移功能（鼠标中键拖拽）</li>
+                <li>在状态栏显示放大倍数</li>
+                <li>在基础设置中添加网格线颜色设置选项</li>
+                <li>添加批量导出为PDF格式的功能</li>
+                <li>添加Excel文件导入功能</li>
+                <li>添加撤销/重做功能，记录最近8次操作</li>
+                <li>添加键盘Delete键删除对象的功能</li>
+                <li>添加文件菜单中的“保存”选项，支持快捷键Ctrl+S</li>
+            </ul>
+        </div>
+        
+        <div class="optimization-log">
+            <h3>界面优化</h3>
+            <ul>
+                <li>调整菜单结构，去掉“编辑”菜单，将“帮助”菜单靠左移位</li>
+                <li>在“帮助”菜单右侧添加“回退”和“重做”按钮</li>
+                <li>扩大左侧绘制区，减少与属性区的间距</li>
+                <li>修改标签尺寸输入限制，将宽度和高度的最大值都设置为300mm</li>
+                <li>鼠标中键按下时显示手型指针，提示可以移动标签</li>
+            </ul>
+        </div>
+        
+        <div class="bug-log">
+            <h3>Bug 修复</h3>
+            <ul>
+                <li>修复CSVPreviewDialog预览数据不更新的问题</li>
+                <li>修复文本对象字体导致编号字体变大的问题</li>
+                <li>修复PDF导出时的JPEG相关错误</li>
+                <li>修复QPointF未定义的错误</li>
+            </ul>
+        </div>
+        
+        <h2>6. Bug和优化日志</h2>
         
         <h3>Bug 日志</h3>
         <div class="bug-log">

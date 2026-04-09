@@ -14,9 +14,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# 版本信息
+VERSION = "v0.7.5"
+RELEASE_DATE = "2026-04-08"
+AUTHOR = "kk120120"
+EMAIL = "hzwtox@hotmail.com"
+GITHUB = "https://github.com/kk120120/qrcode-label-maker"
+
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QPainter, QPen, QColor, QBrush, QPixmap, QFont
-from PyQt5.QtCore import Qt, QPoint, QRectF, QTimer
+from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer
 import sys
 import os
 
@@ -50,20 +57,32 @@ class LabelDesigner(QWidget):
         self.is_dragging = False
         self.drag_start = QPoint()
         self.qr_generator = QRGenerator()
+        self.show_grid = False  # 网格显示状态
+        self.grid_color = QColor(180, 180, 180)  # 默认为比淡灰色深一点的颜色
+        self.zoom = 1.0  # 缩放比例
+        self.pan_offset = QPointF(0, 0)  # 平移偏移
+        self.is_panning = False  # 平移状态
+        self.pan_start = QPointF()  # 平移起始点
         
     def paintEvent(self, event):
         """绘制事件"""
         painter = QPainter(self)
+        
+        # 应用平移
+        painter.translate(self.pan_offset)
         
         # 绘制标签背景
         label_width = self.template.template['label_size']['width']
         label_height = self.template.template['label_size']['height']
         corner_radius = self.template.template['label_size']['corner_radius']
         
-        # 计算缩放比例
-        scale = min(self.width() / (label_width + 20), self.height() / (label_height + 20))
+        # 计算缩放比例 - 减少边距到3mm左右
+        base_scale = min(self.width() / (label_width + 6), self.height() / (label_height + 6))
+        scale = base_scale * self.zoom
         x_offset = (self.width() - label_width * scale) / 2
         y_offset = (self.height() - label_height * scale) / 2
+        
+
         
         # 绘制标签边框
         painter.setPen(QPen(QColor(0, 0, 0), 1))
@@ -101,8 +120,22 @@ class LabelDesigner(QWidget):
             # 绘制对象类型简称和序号
             obj_type = "QR" if obj['type'] == 'qr' else "Text"
             obj_name = f"{obj_type} #{i+1}"
+            
+            # 保存当前字体和画笔
+            original_font = painter.font()
+            original_pen = painter.pen()
+            
+            # 设置编号专用字体和颜色
+            number_font = QFont("Arial", 8)  # 使用固定大小的字体
+            painter.setFont(number_font)
             painter.setPen(QPen(QColor(255, 0, 0), 1))
+            
+            # 绘制编号
             painter.drawText(int(x + 5), int(y - 5), obj_name)
+            
+            # 恢复原始字体和画笔
+            painter.setFont(original_font)
+            painter.setPen(original_pen)
             
             # 绘制对象内容
             painter.setPen(QPen(QColor(0, 0, 0), 1))
@@ -166,14 +199,51 @@ class LabelDesigner(QWidget):
                     painter.drawText(int(x + 5), int(y + font_size * scale + 5), content[:20])  # 显示前20个字符
                 else:
                     painter.drawText(int(x + 5), int(y + font_size * scale + 5), "Text")
-    
+        
+        # 绘制网格（放在最上层）
+        if self.show_grid:
+            # 网格大小：5mm
+            grid_size = 5
+            
+            # 设置虚线笔，使用grid_color属性
+            pen = QPen(self.grid_color, 0.5, Qt.PenStyle.DotLine)
+            painter.setPen(pen)
+            
+            # 绘制水平网格线（充满整个绘图区）
+            grid_step = int(grid_size * scale)
+            for y in range(0, int(self.height() * 2), grid_step):
+                painter.drawLine(-self.width(), y, self.width() * 2, y)
+                
+                # 在下侧显示网格尺寸值
+                if y > 0:
+                    actual_y = y / scale
+                    if actual_y % 10 == 0:  # 每10mm显示一次尺寸
+                        painter.drawText(5, y + 10, f"{actual_y:.0f}mm")
+            
+            # 绘制垂直网格线（充满整个绘图区）
+            for x in range(0, int(self.width() * 2), grid_step):
+                painter.drawLine(x, -self.height(), x, self.height() * 2)
+                
+                # 在左侧显示网格尺寸值
+                if x > 0:
+                    actual_x = x / scale
+                    if actual_x % 10 == 0:  # 每10mm显示一次尺寸
+                        painter.drawText(x - 20, 15, f"{actual_x:.0f}mm")
+
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.MouseButton.MiddleButton:
+            # 开始平移
+            self.is_panning = True
+            self.pan_start = event.pos()
+            # 鼠标指针变为手型
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+        elif event.button() == Qt.MouseButton.LeftButton:
             # 计算缩放比例
             label_width = self.template.template['label_size']['width']
             label_height = self.template.template['label_size']['height']
-            scale = min(self.width() / (label_width + 20), self.height() / (label_height + 20))
+            base_scale = min(self.width() / (label_width + 20), self.height() / (label_height + 20))
+            scale = base_scale * self.zoom
             x_offset = (self.width() - label_width * scale) / 2
             y_offset = (self.height() - label_height * scale) / 2
             
@@ -226,7 +296,13 @@ class LabelDesigner(QWidget):
     
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
-        if self.selected_object:
+        if self.is_panning:
+            # 处理平移
+            delta = event.pos() - self.pan_start
+            self.pan_offset += QPointF(delta)
+            self.pan_start = event.pos()
+            self.update()
+        elif self.selected_object:
             # 如果是首次移动，设置is_dragging为True
             if not self.is_dragging:
                 self.is_dragging = True
@@ -234,7 +310,8 @@ class LabelDesigner(QWidget):
             # 计算缩放比例
             label_width = self.template.template['label_size']['width']
             label_height = self.template.template['label_size']['height']
-            scale = min(self.width() / (label_width + 20), self.height() / (label_height + 20))
+            base_scale = min(self.width() / (label_width + 20), self.height() / (label_height + 20))
+            scale = base_scale * self.zoom
             
             # 计算移动距离
             delta_x = (event.x() - self.drag_start.x()) / scale
@@ -262,7 +339,12 @@ class LabelDesigner(QWidget):
 
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.MouseButton.MiddleButton:
+            # 结束平移
+            self.is_panning = False
+            # 鼠标指针恢复为默认形状
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+        elif event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = False
             # 通知主窗口更新整个属性面板
             if self.parent() and hasattr(self.parent(), 'update_property_panel'):
@@ -306,6 +388,29 @@ class LabelDesigner(QWidget):
                         self.parent().update_property_panel()
                 self.update()
     
+    def wheelEvent(self, event):
+        """鼠标滚轮事件，实现缩放功能"""
+        # 检查是否按住Ctrl键
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            # 计算缩放因子
+            delta = event.angleDelta().y() / 120
+            zoom_factor = 1.1 if delta > 0 else 0.9
+            
+            # 计算新的缩放比例
+            new_zoom = self.zoom * zoom_factor
+            
+            # 限制缩放范围
+            new_zoom = max(0.3, min(new_zoom, 3.0))  # 最小30%，最大300%
+            
+            if new_zoom != self.zoom:
+                self.zoom = new_zoom
+                self.update()
+                
+                # 在状态栏显示放大倍数
+                if hasattr(self.parent(), 'statusBar'):
+                    zoom_percent = int(self.zoom * 100)
+                    self.parent().statusBar.showMessage(f"缩放: {zoom_percent}%")
+
     def add_qr_object(self, x, y):
         """添加二维码对象"""
         obj_id = self.template.add_qr_object(x, y)
@@ -374,6 +479,12 @@ class MainWindow(QMainWindow):
         basic_settings_action.triggered.connect(self.open_basic_settings)
         settings_menu.addAction(basic_settings_action)
         
+        # 网格选项
+        self.grid_action = QAction("网格", self)
+        self.grid_action.setCheckable(True)
+        self.grid_action.triggered.connect(self.toggle_grid)
+        settings_menu.addAction(self.grid_action)
+        
         # 文件菜单
         file_menu = menubar.addMenu("文件")
         
@@ -389,18 +500,30 @@ class MainWindow(QMainWindow):
         save_action.triggered.connect(self.save_template)
         file_menu.addAction(save_action)
         
+        # 添加保存选项，支持快捷键 Ctrl+S
+        quick_save_action = QAction("保存", self)
+        quick_save_action.setShortcut("Ctrl+S")
+        quick_save_action.triggered.connect(self.quick_save)
+        file_menu.addAction(quick_save_action)
+        
         file_menu.addSeparator()
         
         exit_action = QAction("退出", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
-        # 数据菜单
-        data_menu = menubar.addMenu("数据")
+        # 导入菜单
+        import_menu = menubar.addMenu("导入")
         
-        import_csv_action = QAction("导入CSV", self)
+        import_csv_action = QAction("csv批量导入", self)
+        import_csv_action.setToolTip("大量数据时导入更快")
         import_csv_action.triggered.connect(self.import_csv)
-        data_menu.addAction(import_csv_action)
+        import_menu.addAction(import_csv_action)
+        
+        # 添加导入Excel功能
+        import_excel_action = QAction("xlsx批量导入", self)
+        import_excel_action.triggered.connect(self.import_excel)
+        import_menu.addAction(import_excel_action)
         
         # 导出菜单
         export_menu = menubar.addMenu("导出")
@@ -413,19 +536,31 @@ class MainWindow(QMainWindow):
         batch_export_action.triggered.connect(self.batch_export)
         export_menu.addAction(batch_export_action)
         
-        # 编辑菜单
-        edit_menu = menubar.addMenu("编辑")
-        
-        delete_action = QAction("删除选中对象", self)
-        delete_action.triggered.connect(self.delete_selected)
-        edit_menu.addAction(delete_action)
-        
         # 帮助菜单
         help_menu = menubar.addMenu("帮助")
         
         about_action = QAction("关于", self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
+        
+        # 添加回退和重做按钮
+        self.undo_action = QAction("回退", self)
+        self.undo_action.triggered.connect(self.undo)
+        self.undo_action.setEnabled(False)
+        menubar.addAction(self.undo_action)
+        
+        self.redo_action = QAction("重做", self)
+        self.redo_action.triggered.connect(self.redo)
+        self.redo_action.setEnabled(False)
+        menubar.addAction(self.redo_action)
+        
+        # 初始化操作历史记录
+        self.history = []
+        self.history_index = -1
+        self.max_history = 8
+        
+        # 初始化当前模板文件名
+        self.current_template_file = None
         
         # 状态栏
         self.statusBar = QStatusBar()
@@ -446,13 +581,12 @@ class MainWindow(QMainWindow):
         # 主要内容区
         content_layout = QHBoxLayout()
         
-        # 设计区
+        # 设计区 - 扩大比例
         self.designer = LabelDesigner()
-        content_layout.addWidget(self.designer, 2)
+        content_layout.addWidget(self.designer, 3)  # 增加权重，扩大设计区
         
-        # 预览区
-        self.preview = QWidget()
-        content_layout.addWidget(self.preview, 1)
+        # 添加间距 - 3mm左右
+        content_layout.addSpacing(10)  # 添加10像素间距，约3mm
         
         # 属性面板
         self.property_panel = PropertyPanel()
@@ -469,6 +603,14 @@ class MainWindow(QMainWindow):
         self.property_panel.color_button.clicked.connect(self.on_color_button_clicked)
         self.property_panel.qr_version_combo.currentTextChanged.connect(self.on_qr_version_changed)
         self.property_panel.error_correction_combo.currentTextChanged.connect(self.on_error_correction_changed)
+        
+        # 初始化网格状态
+        self.designer.show_grid = False
+        
+        # 文本样式复选框信号连接
+        self.property_panel.bold_checkbox.stateChanged.connect(self.on_save_properties)
+        self.property_panel.italic_checkbox.stateChanged.connect(self.on_save_properties)
+        self.property_panel.underline_checkbox.stateChanged.connect(self.on_save_properties)
         
         # 为输入框添加回车键信号连接
         self.property_panel.x_input.editingFinished.connect(self.on_save_properties)
@@ -496,6 +638,9 @@ class MainWindow(QMainWindow):
                 settings['corner_radius']
             )
             self.designer.template.set_dpi(settings['dpi'])
+            # 设置网格颜色
+            if 'grid_color' in settings:
+                self.designer.grid_color = QColor(settings['grid_color'])
             self.designer.update()
             self.statusBar.showMessage("基础设置已更新")
     
@@ -504,6 +649,7 @@ class MainWindow(QMainWindow):
         self.designer.template = LabelTemplate()
         self.designer.selected_object = None
         self.designer.update()
+        self.current_template_file = None  # 新建模板时重置文件名
         self.statusBar.showMessage("已新建模板")
     
     def open_template(self):
@@ -515,6 +661,7 @@ class MainWindow(QMainWindow):
             if self.designer.template.load_template(file_path):
                 self.designer.selected_object = None
                 self.designer.update()
+                self.current_template_file = file_path  # 更新当前模板文件名
                 self.statusBar.showMessage(f"已打开模板: {file_path}")
             else:
                 QMessageBox.warning(self, "错误", "加载模板失败")
@@ -526,9 +673,31 @@ class MainWindow(QMainWindow):
         )
         if file_path:
             if self.designer.template.save_template(file_path):
+                self.current_template_file = file_path  # 更新当前模板文件名
                 self.statusBar.showMessage(f"已保存模板: {file_path}")
             else:
                 QMessageBox.warning(self, "错误", "保存模板失败")
+    
+    def quick_save(self):
+        """快速保存当前模板，支持快捷键 Ctrl+S"""
+        if self.current_template_file:
+            # 如果已有保存的模板文件，直接保存
+            if self.designer.template.save_template(self.current_template_file):
+                self.statusBar.showMessage(f"已保存模板: {self.current_template_file}")
+            else:
+                QMessageBox.warning(self, "错误", "保存模板失败")
+        else:
+            # 如果是新模板，调用保存模板功能
+            self.save_template()
+    
+    def toggle_grid(self):
+        """切换网格显示状态"""
+        self.designer.show_grid = self.grid_action.isChecked()
+        self.designer.update()
+        if self.designer.show_grid:
+            self.statusBar.showMessage("网格已打开")
+        else:
+            self.statusBar.showMessage("网格已关闭")
     
     def import_csv(self):
         """导入CSV"""
@@ -546,6 +715,26 @@ class MainWindow(QMainWindow):
                     self.statusBar.showMessage(f"已导入CSV: {file_path}")
             else:
                 QMessageBox.warning(self, "错误", "导入CSV失败")
+    
+    def import_excel(self):
+        """导入Excel"""
+        # 提示用户只导入第一个sheet的数据
+        QMessageBox.information(self, "提示", "只导入第一个sheet的数据，默认第一行为列名")
+        
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "导入Excel", "d:/", "Excel Files (*.xlsx *.xls)"
+        )
+        if file_path:
+            if self.csv_handler.import_excel(file_path):
+                # 显示预览对话框
+                dialog = CSVPreviewDialog(self.csv_handler, self)
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    # 更新属性面板中的CSV列
+                    columns = self.csv_handler.get_columns()
+                    self.property_panel.update_csv_columns(columns)
+                    self.statusBar.showMessage(f"已导入Excel: {file_path}")
+            else:
+                QMessageBox.warning(self, "错误", "导入Excel失败")
     
     def update_qr_sizes(self):
         """更新二维码尺寸选择"""
@@ -582,9 +771,15 @@ class MainWindow(QMainWindow):
         label_height = self.designer.template.template['label_size']['height']
         x = (label_width - 10) / 2
         y = (label_height - 10) / 2
-        self.designer.add_qr_object(x, y)
+        obj_id = self.designer.add_qr_object(x, y)
         self.property_panel.show_qr_properties()
         self.update_property_panel()
+        
+        # 记录操作历史
+        obj = self.designer.template.get_object(obj_id)
+        if obj:
+            import copy
+            self.record_history("add", {"obj_id": obj_id, "obj_data": copy.deepcopy(obj)})
     
     def on_text_button_clicked(self):
         """点击文本按钮"""
@@ -593,7 +788,13 @@ class MainWindow(QMainWindow):
         label_height = self.designer.template.template['label_size']['height']
         x = (label_width - 30) / 2
         y = (label_height - 10) / 2
-        self.designer.add_text_object(x, y)
+        obj_id = self.designer.add_text_object(x, y)
+        
+        # 记录操作历史
+        obj = self.designer.template.get_object(obj_id)
+        if obj:
+            import copy
+            self.record_history("add", {"obj_id": obj_id, "obj_data": copy.deepcopy(obj)})
         self.property_panel.show_text_properties()
         self.update_property_panel()
     
@@ -601,6 +802,10 @@ class MainWindow(QMainWindow):
         """保存属性"""
         obj = self.designer.get_selected_object()
         if obj:
+            # 记录操作历史 - 保存旧属性
+            import copy
+            old_data = copy.deepcopy(obj)
+            
             # 更新基本属性
             x = self.property_panel.x_input.value()
             y = self.property_panel.y_input.value()
@@ -663,6 +868,17 @@ class MainWindow(QMainWindow):
             self.designer.update_object_properties(
                 x=x, y=y, width=width, height=height, properties=properties
             )
+            
+            # 记录操作历史 - 保存新属性
+            new_obj = self.designer.get_selected_object()
+            if new_obj:
+                new_data = copy.deepcopy(new_obj)
+                self.record_history("update", {
+                    "obj_id": obj['id'],
+                    "old_data": old_data,
+                    "new_data": new_data
+                })
+            
             self.statusBar.showMessage("属性已保存")
     
     def update_property_panel(self):
@@ -810,8 +1026,21 @@ class MainWindow(QMainWindow):
     
     def delete_selected(self):
         """删除选中对象"""
-        self.designer.remove_selected_object()
-        self.statusBar.showMessage("已删除选中对象")
+        if self.designer.selected_object:
+            # 记录操作历史
+            obj = self.designer.template.get_object(self.designer.selected_object)
+            if obj:
+                import copy
+                self.record_history("delete", {"obj_id": self.designer.selected_object, "obj_data": copy.deepcopy(obj)})
+            
+            self.designer.remove_selected_object()
+            self.update_property_panel()
+            self.statusBar.showMessage("已删除选中对象")
+    
+    def keyPressEvent(self, event):
+        """键盘按下事件"""
+        if event.key() == Qt.Key_Delete:
+            self.delete_selected()
     
     def export_current(self):
         """导出当前标签"""
@@ -888,6 +1117,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "提示", "请选择目标文件夹")
             return
         
+        # 获取选择的导出格式
+        export_format = dialog.get_selected_format()
+        
         # 开始批量处理
         template = self.designer.template.get_template()
         csv_data = self.csv_handler.get_data()
@@ -904,7 +1136,18 @@ class MainWindow(QMainWindow):
         QApplication.processEvents()  # 确保进度窗及时显示
         
         # 批量处理
-        results = self.image_processor.batch_process(template, csv_data, output_dir)
+        pdf_filename = None
+        if export_format == "pdf":
+            # 使用模板文件名作为PDF文件名
+            if self.current_template_file:
+                # 从模板文件路径中提取文件名（不含扩展名）
+                import os
+                pdf_filename = os.path.splitext(os.path.basename(self.current_template_file))[0]
+            else:
+                # 模板尚未保存，使用默认文件名
+                pdf_filename = "notsavedTemplate"
+        
+        results = self.image_processor.batch_process(template, csv_data, output_dir, export_format, pdf_filename)
         
         # 完成
         if csv_data is not None:
@@ -912,9 +1155,15 @@ class MainWindow(QMainWindow):
         else:
             dialog.progress.setValue(100)
         QApplication.processEvents()  # 确保进度条更新
-        QMessageBox.information(self, "完成", f"已生成 {len(results)} 个标签")
+        
+        # 根据导出格式显示不同的完成信息
+        if export_format == "png":
+            QMessageBox.information(self, "完成", f"已生成 {len(results)} 个PNG标签")
+        else:
+            QMessageBox.information(self, "完成", f"已生成 PDF 文件，包含 {len(csv_data)} 个标签")
+        
         dialog.accept()
-        self.statusBar.showMessage(f"批量导出完成，生成 {len(results)} 个标签")
+        self.statusBar.showMessage(f"批量导出完成，生成 {len(results)} 个文件")
     
     def resizeEvent(self, event):
         """窗口大小变化事件"""
@@ -922,7 +1171,89 @@ class MainWindow(QMainWindow):
         # 主窗口大小变化时，设计器会自动更新，因为它已经有了resizeEvent处理
     
     def show_about(self):
-        QMessageBox.information(self, "关于", f"Python 批量二维码标签生成器\n版本：V0.7.2\t2026-04-07\n作者：kk120120\n邮箱：hzwtox@hotmail.com\nGitHub：https://github.com/kk120120/qrcode-label-maker\n\nCopyright (C) 2026\n\nThis program is free software: you can redistribute it and/or modify\nit under the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.")
+        QMessageBox.information(self, "关于", f"Python 批量二维码标签生成器
+版本：{VERSION}\t{RELEASE_DATE}\n作者：{AUTHOR}\n邮箱：{EMAIL}\nGitHub：{GITHUB}\n\nCopyright (C) 2026\n\nThis program is free software: you can redistribute it and/or modify\nit under the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.")
+    
+    def record_history(self, action_type, data):
+        """记录操作历史"""
+        # 截断历史记录到当前索引
+        if self.history_index < len(self.history) - 1:
+            self.history = self.history[:self.history_index + 1]
+        
+        # 添加新操作
+        self.history.append({"type": action_type, "data": data})
+        
+        # 限制历史记录长度
+        if len(self.history) > self.max_history:
+            self.history.pop(0)
+        else:
+            self.history_index += 1
+        
+        # 更新回退/重做按钮状态
+        self.update_history_buttons()
+    
+    def update_history_buttons(self):
+        """更新回退/重做按钮状态"""
+        self.undo_action.setEnabled(self.history_index >= 0)
+        self.redo_action.setEnabled(self.history_index < len(self.history) - 1)
+    
+    def undo(self):
+        """回退操作"""
+        if self.history_index >= 0:
+            action = self.history[self.history_index]
+            self.history_index -= 1
+            
+            if action["type"] == "add":
+                # 回退添加操作 - 删除对象
+                obj_id = action["data"]["obj_id"]
+                self.designer.template.remove_object(obj_id)
+            elif action["type"] == "delete":
+                # 回退删除操作 - 重新添加对象
+                obj_data = action["data"]["obj_data"]
+                # 重建对象
+                if obj_data["type"] == "qr":
+                    self.designer.template.template["objects"].append(obj_data)
+                elif obj_data["type"] == "text":
+                    self.designer.template.template["objects"].append(obj_data)
+            elif action["type"] == "update":
+                # 回退更新操作 - 恢复旧属性
+                obj_id = action["data"]["obj_id"]
+                old_data = action["data"]["old_data"]
+                obj = self.designer.template.get_object(obj_id)
+                if obj:
+                    obj.update(old_data)
+            
+            self.designer.selected_object = None
+            self.designer.update()
+            self.update_history_buttons()
+            self.statusBar.showMessage("已回退操作")
+    
+    def redo(self):
+        """重做操作"""
+        if self.history_index < len(self.history) - 1:
+            self.history_index += 1
+            action = self.history[self.history_index]
+            
+            if action["type"] == "add":
+                # 重做添加操作 - 重新添加对象
+                obj_data = action["data"]["obj_data"]
+                self.designer.template.template["objects"].append(obj_data)
+            elif action["type"] == "delete":
+                # 重做删除操作 - 删除对象
+                obj_id = action["data"]["obj_id"]
+                self.designer.template.remove_object(obj_id)
+            elif action["type"] == "update":
+                # 重做更新操作 - 应用新属性
+                obj_id = action["data"]["obj_id"]
+                new_data = action["data"]["new_data"]
+                obj = self.designer.template.get_object(obj_id)
+                if obj:
+                    obj.update(new_data)
+            
+            self.designer.selected_object = None
+            self.designer.update()
+            self.update_history_buttons()
+            self.statusBar.showMessage("已重做操作")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

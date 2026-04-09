@@ -18,8 +18,10 @@ from PyQt5.QtWidgets import (
     QWidget, QPushButton, QLabel, QLineEdit, QComboBox, QCheckBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox, QSpinBox,
     QDoubleSpinBox, QColorDialog, QTableWidget, QTableWidgetItem,
-    QFileDialog, QProgressDialog, QMessageBox, QScrollArea, QDialog
+    QFileDialog, QProgressDialog, QMessageBox, QScrollArea, QDialog,
+    QRadioButton
 )
+from PyQt5.QtWidgets import QButtonGroup
 from PyQt5.QtGui import QFont, QColor, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize
 import os
@@ -258,12 +260,12 @@ class BasicSettingsDialog(QDialog):
         
         self.width_label = QLabel("宽度:")
         self.width_input = QSpinBox()
-        self.width_input.setRange(10, 200)
+        self.width_input.setRange(10, 300)
         self.width_input.setSingleStep(1)
         
         self.height_label = QLabel("高度:")
         self.height_input = QSpinBox()
-        self.height_input.setRange(10, 200)
+        self.height_input.setRange(10, 300)
         self.height_input.setSingleStep(1)
         
         self.corner_label = QLabel("圆角:")
@@ -290,6 +292,33 @@ class BasicSettingsDialog(QDialog):
         
         dpi_layout.addWidget(self.dpi_label, 0, 0)
         dpi_layout.addWidget(self.dpi_input, 0, 1)
+        
+        # 网格设置
+        grid_group = QGroupBox("网格设置")
+        grid_layout = QGridLayout()
+        grid_group.setLayout(grid_layout)
+        
+        self.grid_color_label = QLabel("网格颜色:")
+        self.grid_color_button = QPushButton("选择颜色")
+        self.grid_color = QColor(180, 180, 180)  # 默认为比淡灰色深一点的颜色
+        
+        # 设置按钮样式以显示当前颜色
+        def update_color_button():
+            style = f"background-color: {self.grid_color.name()}"
+            self.grid_color_button.setStyleSheet(style)
+        
+        update_color_button()
+        
+        def choose_color():
+            color = QColorDialog.getColor(self.grid_color, self, "选择网格颜色")
+            if color.isValid():
+                self.grid_color = color
+                update_color_button()
+        
+        self.grid_color_button.clicked.connect(choose_color)
+        
+        grid_layout.addWidget(self.grid_color_label, 0, 0)
+        grid_layout.addWidget(self.grid_color_button, 0, 1)
         
         # 按钮
         button_layout = QHBoxLayout()
@@ -322,7 +351,8 @@ class BasicSettingsDialog(QDialog):
             'width': self.width_input.value(),
             'height': self.height_input.value(),
             'corner_radius': self.corner_input.value(),
-            'dpi': self.dpi_input.value()
+            'dpi': self.dpi_input.value(),
+            'grid_color': self.grid_color.name()
         }
 
 class CSVPreviewDialog(QDialog):
@@ -382,16 +412,22 @@ class CSVPreviewDialog(QDialog):
         data = self.csv_handler.get_preview_data(start_row, 5)
         
         if data is not None:
+            # 清空表格并重新设置
+            self.table.clear()
             self.table.setRowCount(len(data))
             self.table.setColumnCount(len(data.columns))
             self.table.setHorizontalHeaderLabels(data.columns)
             
-            for i, row in data.iterrows():
+            # 更新表格内容和行号
+            for i, (index, row) in enumerate(data.iterrows()):
+                # 设置行号为实际的数据行号
+                self.table.setVerticalHeaderItem(i, QTableWidgetItem(str(index + 1)))
                 for j, value in enumerate(row):
                     item = QTableWidgetItem(str(value))
                     self.table.setItem(i, j, item)
         else:
             # 清空表格
+            self.table.clear()
             self.table.setRowCount(0)
             self.table.setColumnCount(0)
 
@@ -400,10 +436,27 @@ class BatchExportDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("批量导出")
-        self.setGeometry(100, 100, 600, 300)
+        self.setGeometry(100, 100, 600, 350)
         
         layout = QVBoxLayout()
         self.setLayout(layout)
+        
+        # 格式选择
+        format_group = QGroupBox("导出格式")
+        format_layout = QVBoxLayout()
+        format_group.setLayout(format_layout)
+        
+        self.format_group = QButtonGroup()
+        
+        self.png_radio = QRadioButton("PNG - 每张标签单独导出为PNG文件")
+        self.png_radio.setChecked(True)  # 默认选中PNG
+        self.pdf_radio = QRadioButton("PDF - 将所有标签合并到一个PDF文件")
+        
+        self.format_group.addButton(self.png_radio)
+        self.format_group.addButton(self.pdf_radio)
+        
+        format_layout.addWidget(self.png_radio)
+        format_layout.addWidget(self.pdf_radio)
         
         # 目标文件夹
         folder_layout = QHBoxLayout()
@@ -427,6 +480,7 @@ class BatchExportDialog(QDialog):
         button_layout.addWidget(self.start_button)
         button_layout.addWidget(self.cancel_button)
         
+        layout.addWidget(format_group)
         layout.addLayout(folder_layout)
         layout.addStretch()
         layout.addLayout(button_layout)
@@ -434,6 +488,14 @@ class BatchExportDialog(QDialog):
         # 信号连接
         self.folder_button.clicked.connect(self.select_folder)
         self.cancel_button.clicked.connect(self.reject)
+    
+    def get_selected_format(self):
+        """获取选中的导出格式"""
+        if self.png_radio.isChecked():
+            return "png"
+        elif self.pdf_radio.isChecked():
+            return "pdf"
+        return "png"
     
     def select_folder(self):
         """选择文件夹"""

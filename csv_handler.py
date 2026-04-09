@@ -35,11 +35,34 @@ class CSVHandler:
                     continue
             
             if self.data is not None:
+                # 清理数据：删除全为空值的行和列
+                self.data = self.data.dropna(how='all').dropna(axis=1, how='all')
                 self.columns = list(self.data.columns)
                 return True
             return False
         except Exception as e:
-            print(f"导入CSV失败: {e}")
+            return False
+    
+    def import_excel(self, file_path):
+        """导入Excel文件"""
+        try:
+            # 只导入第一个sheet（使用序号0），默认第一行为列名
+            # 使用sheet序号0表示第一个sheet，而不是使用sheet名称
+            # 使用calamine引擎提高读取速度
+            try:
+                # 尝试使用calamine引擎
+                self.data = pd.read_excel(file_path, sheet_name=0, engine='calamine')
+            except Exception as e:
+                # 如果calamine引擎不可用，回退到默认引擎
+                self.data = pd.read_excel(file_path, sheet_name=0)
+            
+            if self.data is not None:
+                # 清理数据：删除全为空值的行和列
+                self.data = self.data.dropna(how='all').dropna(axis=1, how='all')
+                self.columns = list(self.data.columns)
+                return True
+            return False
+        except Exception as e:
             return False
     
     def get_columns(self):
