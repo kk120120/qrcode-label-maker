@@ -1171,8 +1171,19 @@ class MainWindow(QMainWindow):
         # 主窗口大小变化时，设计器会自动更新，因为它已经有了resizeEvent处理
     
     def show_about(self):
-        QMessageBox.information(self, "关于", f"Python 批量二维码标签生成器
-版本：{VERSION}\t{RELEASE_DATE}\n作者：{AUTHOR}\n邮箱：{EMAIL}\nGitHub：{GITHUB}\n\nCopyright (C) 2026\n\nThis program is free software: you can redistribute it and/or modify\nit under the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.")
+        about_text = (
+            f"Python 批量二维码标签生成器\n"
+            f"版本：{VERSION}\t{RELEASE_DATE}\n"
+            f"作者：{AUTHOR}\n"
+            f"邮箱：{EMAIL}\n"
+            f"GitHub：{GITHUB}\n\n"
+            f"Copyright (C) 2026\n\n"
+            f"This program is free software: you can redistribute it and/or modify\n"
+            f"it under the terms of the GNU General Public License as published by\n"
+            f"the Free Software Foundation, either version 3 of the License, or\n"
+            f"(at your option) any later version."
+        )
+        QMessageBox.information(self, "关于", about_text)
     
     def record_history(self, action_type, data):
         """记录操作历史"""
