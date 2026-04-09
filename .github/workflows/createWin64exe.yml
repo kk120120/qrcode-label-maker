@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write  # 允许写入仓库内容
 
     steps:
       - name: 拉取代码
@@ -31,14 +33,17 @@ jobs:
         run: |
           $version = (Select-String -Path "main.py" -Pattern 'VERSION = "(.*?)"').Matches.Groups[1].Value
           echo "version=$version" >> $env:GITHUB_ENV
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 
       - name: 用 spec 文件打包 EXE
         run: |
           pyinstaller qr-label-creator.spec
 
-      - name: 创建 released 目录
+      - name: 创建 released 目录（如果不存在）
         run: |
-          New-Item -ItemType Directory -Path "released" -Force
+          if (-not (Test-Path "released")) {
+            New-Item -ItemType Directory -Path "released" -Force
+          }
 
       - name: 复制并重命名打包文件到 released 目录
         run: |
@@ -49,6 +54,14 @@ jobs:
           Copy-Item -Path $sourcePath -Destination $destPath -Recurse -Force
           # 创建压缩包
           Compress-Archive -Path $destPath -DestinationPath "released\qrcode-label-creator-$version-$date.zip" -Force
+
+      - name: 提交 released 文件夹到仓库
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add released/
+          git commit -m "Auto: Build and release qrcode-label-creator ${{ steps.get_version.outputs.VERSION }}" || echo "No changes to commit"
+          git push
 
       - name: 上传生成的程序
         uses: actions/upload-artifact@v4
