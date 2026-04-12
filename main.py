@@ -15,8 +15,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # 版本信息
-VERSION = "v0.7.8"
-RELEASE_DATE = "2026-04-09"
+VERSION = "v0.7.9"
+RELEASE_DATE = "2026-04-12"
 AUTHOR = "kk120120"
 EMAIL = "hzwtox@hotmail.com"
 GITHUB = "https://github.com/kk120120/qrcode-label-maker"
@@ -92,6 +92,13 @@ class LabelDesigner(QWidget):
             int(label_width * scale), int(label_height * scale), 
             int(corner_radius * scale), int(corner_radius * scale)
         )
+        
+        # 绘制0,0点标记
+        painter.setPen(QPen(QColor(255, 0, 0), 2))
+        painter.drawLine(int(x_offset - 5), int(y_offset), int(x_offset + 5), int(y_offset))
+        painter.drawLine(int(x_offset), int(y_offset - 5), int(x_offset), int(y_offset + 5))
+        painter.setPen(QPen(QColor(255, 0, 0), 1))
+        painter.drawText(int(x_offset + 5), int(y_offset - 5), "(0,0)")
         
         # 绘制对象
         out_of_bounds = self.template.check_boundaries()
@@ -194,11 +201,32 @@ class LabelDesigner(QWidget):
                 
                 painter.setFont(qfont)
                 
+                # 设置裁剪区域，确保文本不超出对象外框
+                painter.setClipRect(x, y, width, height)
+                
                 if content:
+                    # 计算可显示的最大字符数，确保不超出宽度
+                    max_width = width - 10  # 减去左右边距
+                    text_to_draw = content
+                    # 使用QFontMetrics计算文本宽度
+                    from PyQt5.QtGui import QFontMetrics
+                    fm = QFontMetrics(qfont)
+                    
+                    # 逐字符检查，找到适合宽度的文本
+                    for i in range(len(content), 0, -1):
+                        if fm.horizontalAdvance(content[:i]) <= max_width:
+                            text_to_draw = content[:i]
+                            break
+                    else:
+                        text_to_draw = ""
+                    
                     # 绘制文本内容
-                    painter.drawText(int(x + 5), int(y + font_size * scale + 5), content[:20])  # 显示前20个字符
+                    painter.drawText(int(x + 5), int(y + font_size * scale + 5), text_to_draw)
                 else:
                     painter.drawText(int(x + 5), int(y + font_size * scale + 5), "Text")
+                
+                # 取消裁剪区域
+                painter.setClipping(False)
         
         # 绘制网格（放在最上层）
         if self.show_grid:
@@ -232,8 +260,12 @@ class LabelDesigner(QWidget):
 
     def mousePressEvent(self, event):
         """鼠标按下事件"""
+        print(f"[调试] 执行函数: LabelDesigner.mousePressEvent")
+        print(f"[调试] 操作: 鼠标按下，按钮={event.button()}")
+        
         if event.button() == Qt.MouseButton.MiddleButton:
             # 开始平移
+            print(f"[调试] 操作: 开始平移")
             self.is_panning = True
             self.pan_start = event.pos()
             # 鼠标指针变为手型
@@ -250,23 +282,64 @@ class LabelDesigner(QWidget):
             # 检查是否点击了对象
             clicked_obj = None
             objects = self.template.get_objects()
+            print(f"[调试] 模板中的对象数量: {len(objects)}")
+            
+            # 获取原始鼠标位置
+            raw_mouse_x = event.pos().x()
+            raw_mouse_y = event.pos().y()
+            
+            # 计算缩放比例和偏移（与paintEvent保持一致）
+            label_width = self.template.template['label_size']['width']
+            label_height = self.template.template['label_size']['height']
+            # 使用与paintEvent相同的边距计算
+            base_scale = min(self.width() / (label_width + 6), self.height() / (label_height + 6))
+            scale = base_scale * self.zoom
+            x_offset = (self.width() - label_width * scale) / 2
+            y_offset = (self.height() - label_height * scale) / 2
+            
+            # 计算考虑平移和缩放后的鼠标位置
+            # 先减去偏移，再考虑平移
+            adjusted_mouse_x = raw_mouse_x - x_offset - self.pan_offset.x()
+            adjusted_mouse_y = raw_mouse_y - y_offset - self.pan_offset.y()
+            
+            print(f"[调试] 原始鼠标位置: x={raw_mouse_x}, y={raw_mouse_y}")
+            print(f"[调试] 缩放比例: {scale}")
+            print(f"[调试] 偏移: x_offset={x_offset}, y_offset={y_offset}")
+            print(f"[调试] 平移: pan_offset.x={self.pan_offset.x()}, pan_offset.y={self.pan_offset.y()}")
+            print(f"[调试] 调整后的鼠标位置: x={adjusted_mouse_x}, y={adjusted_mouse_y}")
+            
             # 从后往前遍历，确保上层对象先被检测
             for i in reversed(range(len(objects))):
                 obj = objects[i]
-                x = int(obj['position']['x'] * scale + x_offset)
-                y = int(obj['position']['y'] * scale + y_offset)
-                width = int(obj['size']['width'] * scale)
-                height = int(obj['size']['height'] * scale)
+                # 计算对象的实际边界（以像素为单位）
+                obj_x = obj['position']['x'] * scale
+                obj_y = obj['position']['y'] * scale
+                obj_width = obj['size']['width'] * scale
+                obj_height = obj['size']['height'] * scale
                 
-                # 创建矩形区域
-                rect = QRectF(x, y, width, height)
-                # 检查鼠标是否在矩形内
-                if rect.contains(event.pos()):
+                # 计算对象的边界范围
+                obj_left = obj_x
+                obj_top = obj_y
+                obj_right = obj_x + obj_width
+                obj_bottom = obj_y + obj_height
+                
+                # 打印对象边界信息
+                print(f"[调试] 对象 {i} - ID: {obj['id']}, 类型: {obj['type']}")
+                print(f"[调试] 对象位置: x={obj['position']['x']}, y={obj['position']['y']}")
+                print(f"[调试] 对象大小: width={obj['size']['width']}, height={obj['size']['height']}")
+                print(f"[调试] 边界（像素）: 左={obj_left}, 上={obj_top}, 右={obj_right}, 下={obj_bottom}")
+                print(f"[调试] 调整后的鼠标位置: x={adjusted_mouse_x}, y={adjusted_mouse_y}")
+                print(f"[调试] 鼠标是否在范围内: x={obj_left <= adjusted_mouse_x <= obj_right}, y={obj_top <= adjusted_mouse_y <= obj_bottom}")
+                
+                # 检查鼠标是否在对象范围内
+                if obj_left <= adjusted_mouse_x <= obj_right and obj_top <= adjusted_mouse_y <= obj_bottom:
                     clicked_obj = obj
+                    print(f"[调试] 点击了对象: ID={obj['id']}, 类型={obj['type']}, CSV列={obj['properties'].get('csv_column', 'None')}")
                     break
             
             if clicked_obj:
                 # 设置选中对象
+                print(f"[调试] 设置选中对象: {clicked_obj['id']}")
                 self.selected_object = clicked_obj['id']
                 # 暂时不设置is_dragging，只有在鼠标移动时才设置
                 self.drag_start = event.pos()
@@ -276,66 +349,92 @@ class LabelDesigner(QWidget):
                 
                 # 直接调用主窗口的update_property_panel方法
                 if self.parent() and hasattr(self.parent(), 'update_property_panel'):
+                    print(f"[调试] 调用者: LabelDesigner.mousePressEvent - 调用主窗口的update_property_panel")
                     self.parent().update_property_panel()
-                    # 再次强制更新，确保属性面板正确显示
-                    QTimer.singleShot(100, lambda: self.parent().update_property_panel())
+                    print("===========================================")
                 else:
                     # 尝试通过其他方式获取主窗口
                     main_window = self.window()
                     if main_window and hasattr(main_window, 'update_property_panel'):
+                        print(f"[调试] 调用者: LabelDesigner.mousePressEvent - 通过window()调用update_property_panel")
                         main_window.update_property_panel()
-                        QTimer.singleShot(100, lambda: main_window.update_property_panel())
+                        print("===========================================")
             else:
                 # 未点击对象，取消选择
+                print(f"[调试] 未点击对象，取消选择")
                 self.selected_object = None
                 # 强制重绘
                 self.update()
                 # 通知主窗口更新属性面板
                 if hasattr(self.parent(), 'update_property_panel'):
+                    print(f"[调试] 调用主窗口的update_property_panel (取消选择)")
                     self.parent().update_property_panel()
     
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
-        if self.is_panning:
-            # 处理平移
-            delta = event.pos() - self.pan_start
-            self.pan_offset += QPointF(delta)
-            self.pan_start = event.pos()
-            self.update()
-        elif self.selected_object:
-            # 如果是首次移动，设置is_dragging为True
-            if not self.is_dragging:
-                self.is_dragging = True
-            
+        # 实时更新状态栏显示鼠标坐标
+        if hasattr(self.parent(), 'statusBar'):
             # 计算缩放比例
             label_width = self.template.template['label_size']['width']
             label_height = self.template.template['label_size']['height']
             base_scale = min(self.width() / (label_width + 20), self.height() / (label_height + 20))
             scale = base_scale * self.zoom
+            x_offset = (self.width() - label_width * scale) / 2
+            y_offset = (self.height() - label_height * scale) / 2
             
-            # 计算移动距离
-            delta_x = (event.x() - self.drag_start.x()) / scale
-            delta_y = (event.y() - self.drag_start.y()) / scale
+            # 计算鼠标在设计区中的坐标
+            if scale > 0:
+                design_x = (event.pos().x() - x_offset - self.pan_offset.x()) / scale
+                design_y = (event.pos().y() - y_offset - self.pan_offset.y()) / scale
+                # 更新状态栏
+                self.parent().statusBar.showMessage(f"鼠标坐标: ({design_x:.2f}, {design_y:.2f}) mm")
+        
+        if self.is_panning:
+            # 计算平移偏移
+            delta = event.pos() - self.pan_start
+            self.pan_offset += delta
+            self.pan_start = event.pos()
+            # 强制重绘
+            self.update()
+        elif self.is_dragging:
+            # 计算缩放比例
+            label_width = self.template.template['label_size']['width']
+            label_height = self.template.template['label_size']['height']
+            base_scale = min(self.width() / (label_width + 20), self.height() / (label_height + 20))
+            scale = base_scale * self.zoom
+            x_offset = (self.width() - label_width * scale) / 2
+            y_offset = (self.height() - label_height * scale) / 2
+            
+            # 计算新位置
+            delta = event.pos() - self.drag_start
+            delta_x = delta.x() / scale
+            delta_y = delta.y() / scale
             
             # 更新对象位置
-            obj = self.template.get_object(self.selected_object)
-            if obj:
-                new_x = obj['position']['x'] + delta_x
-                new_y = obj['position']['y'] + delta_y
-                
-                # 直接更新对象的位置，避免调用update_object方法
-                obj['position']['x'] = new_x
-                obj['position']['y'] = new_y
-                
-                # 更新drag_start
-                self.drag_start = event.pos()
-                
-                # 在状态栏显示当前坐标
-                if hasattr(self.parent(), 'statusBar'):
-                    self.parent().statusBar.showMessage(f"坐标: X={new_x:.2f} mm, Y={new_y:.2f} mm")
-                
-                # 只在需要时重绘
-                self.update()
+            if self.selected_object:
+                obj = self.template.get_object(self.selected_object)
+                if obj:
+                    new_x = obj['position']['x'] + delta_x
+                    new_y = obj['position']['y'] + delta_y
+                    # 确保对象不超出标签边界
+                    label_width = self.template.template['label_size']['width']
+                    label_height = self.template.template['label_size']['height']
+                    new_x = max(0, min(new_x, label_width - obj['size']['width']))
+                    new_y = max(0, min(new_y, label_height - obj['size']['height']))
+                    
+                    # 更新对象位置
+                    obj['position']['x'] = new_x
+                    obj['position']['y'] = new_y
+                    
+                    # 强制重绘
+                    self.update()
+                    
+                    # 更新状态栏信息
+                    if hasattr(self.parent(), 'statusBar'):
+                        self.parent().statusBar.showMessage(f"正在移动对象: ({new_x:.2f}, {new_y:.2f})")
+            
+            # 更新拖动起点
+            self.drag_start = event.pos()
 
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
@@ -349,14 +448,11 @@ class LabelDesigner(QWidget):
             # 通知主窗口更新整个属性面板
             if self.parent() and hasattr(self.parent(), 'update_property_panel'):
                 self.parent().update_property_panel()
-                # 再次强制更新，确保属性面板正确显示
-                QTimer.singleShot(100, lambda: self.parent().update_property_panel())
             else:
                 # 尝试通过其他方式获取主窗口
                 main_window = self.window()
                 if main_window and hasattr(main_window, 'update_property_panel'):
                     main_window.update_property_panel()
-                    QTimer.singleShot(100, lambda: main_window.update_property_panel())
             # 清除状态栏信息
             if hasattr(self.parent(), 'statusBar'):
                 self.parent().statusBar.clearMessage()
@@ -523,12 +619,13 @@ class MainWindow(QMainWindow):
         import_menu = menubar.addMenu("导入")
         
         import_csv_action = QAction("csv批量导入", self)
-        import_csv_action.setToolTip("大量数据时导入更快")
+        import_csv_action.setToolTip("大量数据时导入更快，但是容易因逗号错行")
+        import_csv_action.setStatusTip("大量数据时导入更快，但是容易因逗号错行")
         import_csv_action.triggered.connect(self.import_csv)
         import_menu.addAction(import_csv_action)
         
         # 添加导入Excel功能
-        import_excel_action = QAction("xlsx批量导入", self)
+        import_excel_action = QAction("xlsx批量导入(推荐)", self)
         import_excel_action.triggered.connect(self.import_excel)
         import_menu.addAction(import_excel_action)
         
@@ -597,7 +694,9 @@ class MainWindow(QMainWindow):
         
         # 属性面板
         self.property_panel = PropertyPanel()
-        content_layout.addWidget(self.property_panel, 1)
+        self.property_panel.setMinimumWidth(300)  # 设置最小宽度
+        self.property_panel.setMaximumWidth(300)  # 设置最大宽度，锁定宽度
+        content_layout.addWidget(self.property_panel)
         
         main_layout.addLayout(content_layout)
         
@@ -605,7 +704,7 @@ class MainWindow(QMainWindow):
         self.toolbar.qr_button.clicked.connect(self.on_qr_button_clicked)
         self.toolbar.text_button.clicked.connect(self.on_text_button_clicked)
         self.property_panel.save_button.clicked.connect(self.on_save_properties)
-        self.property_panel.batch_checkbox.stateChanged.connect(self.on_batch_checkbox_changed)
+        self.property_panel.qr_batch_checkbox.stateChanged.connect(self.on_batch_checkbox_changed)
         self.property_panel.text_batch_checkbox.stateChanged.connect(self.on_text_batch_checkbox_changed)
         self.property_panel.color_button.clicked.connect(self.on_color_button_clicked)
         self.property_panel.qr_version_combo.currentTextChanged.connect(self.on_qr_version_changed)
@@ -662,10 +761,14 @@ class MainWindow(QMainWindow):
     
     def open_template(self):
         """打开模板"""
+        # 获取保存的目录，默认为 d:/
+        last_dir = self.config_manager.get_last_open_dir() or "d:/"
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "打开模板", "d:/", "Label Files (*.label)"
+            self, "打开模板", last_dir, "Label Files (*.label)"
         )
         if file_path:
+            # 更新保存的目录
+            self.config_manager.set_last_open_dir(os.path.dirname(file_path))
             if self.designer.template.load_template(file_path):
                 self.designer.selected_object = None
                 self.designer.update()
@@ -709,37 +812,47 @@ class MainWindow(QMainWindow):
     
     def import_csv(self):
         """导入CSV"""
+        # 获取保存的导入目录，默认为 d:/
+        last_import_dir = self.config_manager.get_last_import_dir() or "d:/"
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "导入CSV", "d:/", "CSV Files (*.csv)"
+            self, "导入CSV", last_import_dir, "CSV Files (*.csv)"
         )
         if file_path:
+            # 更新保存的导入目录
+            self.config_manager.set_last_import_dir(os.path.dirname(file_path))
             if self.csv_handler.import_csv(file_path):
                 # 显示预览对话框
                 dialog = CSVPreviewDialog(self.csv_handler, self)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     # 更新属性面板中的CSV列
                     columns = self.csv_handler.get_columns()
-                    self.property_panel.update_csv_columns(columns)
+                    self.property_panel.update_qr_csv_columns(columns)
+                    self.property_panel.update_text_csv_columns(columns)
                     self.statusBar.showMessage(f"已导入CSV: {file_path}")
             else:
                 QMessageBox.warning(self, "错误", "导入CSV失败")
-    
+
     def import_excel(self):
         """导入Excel"""
         # 提示用户只导入第一个sheet的数据
         QMessageBox.information(self, "提示", "只导入第一个sheet的数据，默认第一行为列名")
         
+        # 获取保存的导入目录，默认为 d:/
+        last_import_dir = self.config_manager.get_last_import_dir() or "d:/"
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "导入Excel", "d:/", "Excel Files (*.xlsx *.xls)"
+            self, "导入Excel", last_import_dir, "Excel Files (*.xlsx *.xls)"
         )
         if file_path:
+            # 更新保存的导入目录
+            self.config_manager.set_last_import_dir(os.path.dirname(file_path))
             if self.csv_handler.import_excel(file_path):
                 # 显示预览对话框
                 dialog = CSVPreviewDialog(self.csv_handler, self)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     # 更新属性面板中的CSV列
                     columns = self.csv_handler.get_columns()
-                    self.property_panel.update_csv_columns(columns)
+                    self.property_panel.update_qr_csv_columns(columns)
+                    self.property_panel.update_text_csv_columns(columns)
                     self.statusBar.showMessage(f"已导入Excel: {file_path}")
             else:
                 QMessageBox.warning(self, "错误", "导入Excel失败")
@@ -781,6 +894,7 @@ class MainWindow(QMainWindow):
         y = (label_height - 10) / 2
         obj_id = self.designer.add_qr_object(x, y)
         self.property_panel.show_qr_properties()
+        print(f"[调试] 调用者: MainWindow.on_qr_button_clicked - 调用update_property_panel")
         self.update_property_panel()
         
         # 记录操作历史
@@ -804,6 +918,7 @@ class MainWindow(QMainWindow):
             import copy
             self.record_history("add", {"obj_id": obj_id, "obj_data": copy.deepcopy(obj)})
         self.property_panel.show_text_properties()
+        print(f"[调试] 调用者: MainWindow.on_text_button_clicked - 调用update_property_panel")
         self.update_property_panel()
     
     def on_save_properties(self):
@@ -826,8 +941,8 @@ class MainWindow(QMainWindow):
                     'qr_version': self.property_panel.qr_version_combo.currentText(),
                     'error_correction': self.property_panel.error_correction_combo.currentText(),
                     'content': self.property_panel.content_input.text(),
-                    'batch': self.property_panel.batch_checkbox.isChecked(),
-                    'csv_column': self.property_panel.csv_column_combo.currentText()
+                    'batch': self.property_panel.qr_batch_checkbox.isChecked(),
+                    'csv_column': self.property_panel.qr_csv_column_combo.currentText()
                 }
                 
                 # 如果是批量生成，使用CSV第一行数据预览
@@ -887,21 +1002,50 @@ class MainWindow(QMainWindow):
                     "new_data": new_data
                 })
             
+            # 强制重绘设计区，确保显示最新信息
+            self.designer.update()
+            
             self.statusBar.showMessage("属性已保存")
     
     def update_property_panel(self):
         """更新属性面板"""
+        # 获取调用者信息
+        import inspect
+        caller_frame = inspect.currentframe().f_back
+        caller_function = inspect.getframeinfo(caller_frame).function
+        print(f"[调试] 执行函数: MainWindow.update_property_panel")
+        print(f"[调试] 调用者: {caller_function}")
         # 强制获取最新的选中对象
         selected_id = self.designer.selected_object
+        print(f"[调试] 选中的对象 ID: {selected_id}")
         
         # 直接从模板中获取对象，而不是通过get_selected_object
         objects = self.designer.template.get_objects()
+        print(f"[调试] 模板中的对象数量: {len(objects)}")
         
         obj = None
         for o in objects:
             if o['id'] == selected_id:
                 obj = o
                 break
+        # 初始化变量
+        csv_column_from_obj = ""
+        batch_status = False
+        
+        if obj:
+            print(f"[调试] 找到的对象 ID: {obj['id']}")
+            print(f"[调试] 对象类型: {obj['type']}")
+            
+            # 提前获取CSV列值和批量生成状态，以防后续操作影响
+            csv_column_from_obj = obj['properties'].get('csv_column', '')
+            batch_status = obj['properties'].get('batch', False)
+            
+            if obj['type'] == 'text':
+                print(f"[调试] 文本对象的 CSV 列: {csv_column_from_obj}")
+                print(f"[调试] 文本对象的批量生成状态: {batch_status}")
+            elif obj['type'] == 'qr':
+                print(f"[调试] 二维码对象的 CSV 列: {csv_column_from_obj}")
+                print(f"[调试] 二维码对象的批量生成状态: {batch_status}")
         
         if obj:
             # 查找对象在列表中的索引
@@ -914,6 +1058,7 @@ class MainWindow(QMainWindow):
             # 更新对象信息标签
             obj_type = "QR" if obj['type'] == 'qr' else "Text"
             self.property_panel.object_info_label.setText(f"选中对象: {obj_type} #{obj_index}")
+            print(f"[调试] 更新对象信息标签: {obj_type} #{obj_index}")
             
             # 强制隐藏所有属性面板，然后再显示正确的面板
             self.property_panel.qr_group.setVisible(False)
@@ -925,9 +1070,11 @@ class MainWindow(QMainWindow):
             
             # 确保显示正确的属性面板
             if obj['type'] == 'qr':
+                print(f"[调试] 显示二维码属性面板")
                 self.property_panel.qr_group.setVisible(True)
                 self.property_panel.text_group.setVisible(False)
             else:
+                print(f"[调试] 显示文本属性面板")
                 self.property_panel.qr_group.setVisible(False)
                 self.property_panel.text_group.setVisible(True)
             
@@ -935,7 +1082,45 @@ class MainWindow(QMainWindow):
             self.property_panel.layout.update()
             self.property_panel.layout.activate()
             
+            # 暂时断开所有可能触发 on_save_properties 的信号连接
+            print(f"[调试] 断开所有可能触发 on_save_properties 的信号连接")
+            
+            # 断开文本样式复选框信号
+            try:
+                self.property_panel.bold_checkbox.stateChanged.disconnect(self.on_save_properties)
+                self.property_panel.italic_checkbox.stateChanged.disconnect(self.on_save_properties)
+                self.property_panel.underline_checkbox.stateChanged.disconnect(self.on_save_properties)
+            except:
+                pass
+            
+            # 断开输入框信号
+            try:
+                self.property_panel.x_input.editingFinished.disconnect(self.on_save_properties)
+                self.property_panel.y_input.editingFinished.disconnect(self.on_save_properties)
+                self.property_panel.width_input.editingFinished.disconnect(self.on_save_properties)
+                self.property_panel.height_input.editingFinished.disconnect(self.on_save_properties)
+                self.property_panel.content_input.editingFinished.disconnect(self.on_save_properties)
+                self.property_panel.text_content_input.editingFinished.disconnect(self.on_save_properties)
+                self.property_panel.font_size_input.editingFinished.disconnect(self.on_save_properties)
+            except:
+                pass
+            
+            # 断开批量复选框信号
+            if obj['type'] == 'qr':
+                print(f"[调试] 断开二维码批量复选框的信号连接")
+                try:
+                    self.property_panel.qr_batch_checkbox.stateChanged.disconnect(self.on_batch_checkbox_changed)
+                except:
+                    pass
+            elif obj['type'] == 'text':
+                print(f"[调试] 断开文本批量复选框的信号连接")
+                try:
+                    self.property_panel.text_batch_checkbox.stateChanged.disconnect(self.on_text_batch_checkbox_changed)
+                except:
+                    pass
+            
             # 更新基本属性
+            print(f"[调试] 更新基本属性")
             self.property_panel.x_input.setValue(obj['position']['x'])
             self.property_panel.y_input.setValue(obj['position']['y'])
             self.property_panel.width_input.setValue(obj['size']['width'])
@@ -943,24 +1128,54 @@ class MainWindow(QMainWindow):
             
             if obj['type'] == 'qr':
                 # 更新二维码属性
+                print(f"[调试] 更新二维码属性")
                 self.property_panel.qr_version_combo.setCurrentText(obj['properties']['qr_version'])
                 self.property_panel.error_correction_combo.setCurrentText(obj['properties']['error_correction'])
                 self.property_panel.content_input.setText(obj['properties']['content'])
-                self.property_panel.batch_checkbox.setChecked(obj['properties']['batch'])
+                self.property_panel.qr_batch_checkbox.setChecked(batch_status)
                 
                 # 更新CSV列选择
                 columns = self.csv_handler.get_columns()
-                self.property_panel.update_csv_columns(columns)
-                if obj['properties']['csv_column'] in columns:
-                    self.property_panel.csv_column_combo.setCurrentText(obj['properties']['csv_column'])
+                print(f"[调试] 二维码对象 - CSV列: {csv_column_from_obj}")
+                
+                # 只有当下拉框为空时才更新选项，避免每次都重置下拉框
+                if self.property_panel.qr_csv_column_combo.count() == 0:
+                    self.property_panel.update_qr_csv_columns(columns)
+                
+                # 只有当csv_column不为空且在列列表中时才设置
+                if csv_column_from_obj and csv_column_from_obj in columns:
+                    self.property_panel.qr_csv_column_combo.setCurrentText(csv_column_from_obj)
+                else:
+                    # 如果csv_column为空或不在列列表中，设置为空字符串
+                    self.property_panel.qr_csv_column_combo.setCurrentText("")
                     
                 # 更新容量显示
                 self.update_capacity_display(
                     obj['properties']['qr_version'],
                     obj['properties']['error_correction']
                 )
+                
+                # 重新连接二维码批量复选框的信号
+                print(f"[调试] 重新连接二维码批量复选框的信号")
+                self.property_panel.qr_batch_checkbox.stateChanged.connect(self.on_batch_checkbox_changed)
+                
+                # 重新连接所有信号
+                print(f"[调试] 重新连接所有信号")
+                # 重新连接文本样式复选框信号
+                self.property_panel.bold_checkbox.stateChanged.connect(self.on_save_properties)
+                self.property_panel.italic_checkbox.stateChanged.connect(self.on_save_properties)
+                self.property_panel.underline_checkbox.stateChanged.connect(self.on_save_properties)
+                # 重新连接输入框信号
+                self.property_panel.x_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.y_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.width_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.height_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.content_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.text_content_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.font_size_input.editingFinished.connect(self.on_save_properties)
             elif obj['type'] == 'text':
                 # 更新文本属性
+                print(f"[调试] 更新文本属性")
                 self.property_panel.font_combo.setCurrentText(obj['properties']['font'])
                 self.property_panel.font_size_input.setValue(obj['properties']['font_size'])
                 
@@ -972,15 +1187,61 @@ class MainWindow(QMainWindow):
                 # 更新颜色
                 self.property_panel.color_preview.setStyleSheet(f"background-color: {obj['properties']['color']};")
                 self.property_panel.text_content_input.setText(obj['properties']['content'])
-                self.property_panel.text_batch_checkbox.setChecked(obj['properties']['batch'])
+                self.property_panel.text_batch_checkbox.setChecked(batch_status)
                 
                 # 更新CSV列选择
                 columns = self.csv_handler.get_columns()
-                self.property_panel.update_csv_columns(columns)
-                if obj['properties']['csv_column'] in columns:
-                    self.property_panel.text_csv_column_combo.setCurrentText(obj['properties']['csv_column'])
+                print(f"[调试] 文本对象 #{obj_index} - 可用的CSV列: {columns}")
+                print(f"[调试] 文本对象 #{obj_index} - 从对象获取的CSV列: {csv_column_from_obj}")
+                
+                # 保存当前CSV列值
+                current_csv_column = csv_column_from_obj
+                print(f"[调试] 文本对象 #{obj_index} - 保存当前CSV列值: {current_csv_column}")
+                
+                # 只有当下拉框为空时才更新选项，避免每次都重置下拉框
+                if self.property_panel.text_csv_column_combo.count() == 0:
+                    print(f"[调试] 更新文本CSV列选择")
+                    self.property_panel.update_text_csv_columns(columns)
+                
+                # 根据批量生成状态启用/禁用CSV列选择，并设置相应的值
+                if batch_status:
+                    print(f"[调试] 文本对象 #{obj_index} - 批量生成已启用，设置CSV列选择")
+                    self.property_panel.text_csv_column_combo.setEnabled(True)
+                    # 只有当csv_column不为空且在列列表中时才设置
+                    if current_csv_column and current_csv_column in columns:
+                        print(f"[调试] 文本对象 #{obj_index} - 设置CSV列为: {current_csv_column}")
+                        self.property_panel.text_csv_column_combo.setCurrentText(current_csv_column)
+                    else:
+                        # 如果csv_column为空或不在列列表中，设置为空字符串
+                        print(f"[调试] 文本对象 #{obj_index} - CSV列不在列表中，设置为空字符串")
+                        self.property_panel.text_csv_column_combo.setCurrentText("")
+                else:
+                    print(f"[调试] 文本对象 #{obj_index} - 批量生成已禁用，禁用CSV列选择")
+                    self.property_panel.text_csv_column_combo.setEnabled(False)
+                    # 当批量生成禁用时，强制设置为空字符串
+                    self.property_panel.text_csv_column_combo.setCurrentText("")
+                
+                # 重新连接文本批量复选框的信号
+                print(f"[调试] 文本对象 #{obj_index} - 重新连接文本批量复选框的信号")
+                self.property_panel.text_batch_checkbox.stateChanged.connect(self.on_text_batch_checkbox_changed)
+                
+                # 重新连接所有信号
+                print(f"[调试] 重新连接所有信号")
+                # 重新连接文本样式复选框信号
+                self.property_panel.bold_checkbox.stateChanged.connect(self.on_save_properties)
+                self.property_panel.italic_checkbox.stateChanged.connect(self.on_save_properties)
+                self.property_panel.underline_checkbox.stateChanged.connect(self.on_save_properties)
+                # 重新连接输入框信号
+                self.property_panel.x_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.y_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.width_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.height_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.content_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.text_content_input.editingFinished.connect(self.on_save_properties)
+                self.property_panel.font_size_input.editingFinished.connect(self.on_save_properties)
         else:
             # 未选择对象时更新标签
+            print(f"[调试] 未选择对象，更新标签")
             self.property_panel.object_info_label.setText("未选择对象")
             # 隐藏所有属性面板
             self.property_panel.qr_group.setVisible(False)
@@ -993,7 +1254,7 @@ class MainWindow(QMainWindow):
                 # 检查是否已导入CSV
                 if not self.csv_handler.get_columns():
                     QMessageBox.warning(self, "提示", "请先导入CSV文件")
-                    self.property_panel.batch_checkbox.setChecked(False)
+                    self.property_panel.qr_batch_checkbox.setChecked(False)
                 else:
                     # 禁用内容输入
                     self.property_panel.content_input.setEnabled(False)
@@ -1003,7 +1264,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"批量生成复选框变化错误: {e}")
             # 确保复选框状态正确
-            self.property_panel.batch_checkbox.setChecked(False)
+            self.property_panel.qr_batch_checkbox.setChecked(False)
             self.property_panel.content_input.setEnabled(True)
 
     def on_text_batch_checkbox_changed(self, state):
@@ -1015,16 +1276,19 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(self, "提示", "请先导入CSV文件")
                     self.property_panel.text_batch_checkbox.setChecked(False)
                 else:
-                    # 禁用内容输入
+                    # 禁用内容输入，启用CSV列选择
                     self.property_panel.text_content_input.setEnabled(False)
+                    self.property_panel.text_csv_column_combo.setEnabled(True)
             else:
-                # 启用内容输入
+                # 启用内容输入，禁用CSV列选择
                 self.property_panel.text_content_input.setEnabled(True)
+                self.property_panel.text_csv_column_combo.setEnabled(False)
         except Exception as e:
             print(f"文本批量生成复选框变化错误: {e}")
             # 确保复选框状态正确
             self.property_panel.text_batch_checkbox.setChecked(False)
             self.property_panel.text_content_input.setEnabled(True)
+            self.property_panel.text_csv_column_combo.setEnabled(False)
     
     def on_color_button_clicked(self):
         """颜色选择按钮点击"""
@@ -1042,6 +1306,7 @@ class MainWindow(QMainWindow):
                 self.record_history("delete", {"obj_id": self.designer.selected_object, "obj_data": copy.deepcopy(obj)})
             
             self.designer.remove_selected_object()
+            print(f"[调试] 调用者: MainWindow.delete_selected - 调用update_property_panel")
             self.update_property_panel()
             self.statusBar.showMessage("已删除选中对象")
     
@@ -1049,6 +1314,12 @@ class MainWindow(QMainWindow):
         """键盘按下事件"""
         if event.key() == Qt.Key_Delete:
             self.delete_selected()
+    
+    def closeEvent(self, event):
+        """窗口关闭事件"""
+        # 保存配置
+        self.config_manager.save_config()
+        event.accept()
     
     def export_current(self):
         """导出当前标签"""
@@ -1244,6 +1515,8 @@ class MainWindow(QMainWindow):
             
             self.designer.selected_object = None
             self.designer.update()
+            print(f"[调试] 调用者: MainWindow.undo - 调用update_property_panel")
+            self.update_property_panel()
             self.update_history_buttons()
             self.statusBar.showMessage("已回退操作")
     
@@ -1271,6 +1544,8 @@ class MainWindow(QMainWindow):
             
             self.designer.selected_object = None
             self.designer.update()
+            print(f"[调试] 调用者: MainWindow.redo - 调用update_property_panel")
+            self.update_property_panel()
             self.update_history_buttons()
             self.statusBar.showMessage("已重做操作")
 

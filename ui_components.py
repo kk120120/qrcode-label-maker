@@ -138,9 +138,9 @@ class PropertyPanel(QWidget):
         self.content_label = QLabel("内容:")
         self.content_input = QLineEdit()
         
-        self.batch_checkbox = QCheckBox("批量生成")
-        self.csv_column_label = QLabel("CSV列:")
-        self.csv_column_combo = QComboBox()
+        self.qr_batch_checkbox = QCheckBox("批量生成")
+        self.qr_csv_column_label = QLabel("关联导入数据列:")
+        self.qr_csv_column_combo = QComboBox()
         
         self.qr_layout.addWidget(self.qr_version_label, 0, 0)
         self.qr_layout.addWidget(self.qr_version_combo, 0, 1)
@@ -149,9 +149,9 @@ class PropertyPanel(QWidget):
         self.qr_layout.addWidget(self.capacity_group, 2, 0, 1, 2)
         self.qr_layout.addWidget(self.content_label, 3, 0)
         self.qr_layout.addWidget(self.content_input, 3, 1)
-        self.qr_layout.addWidget(self.batch_checkbox, 4, 0, 1, 2)
-        self.qr_layout.addWidget(self.csv_column_label, 5, 0)
-        self.qr_layout.addWidget(self.csv_column_combo, 5, 1)
+        self.qr_layout.addWidget(self.qr_batch_checkbox, 4, 0)
+        self.qr_layout.addWidget(self.qr_csv_column_label, 5, 0)
+        self.qr_layout.addWidget(self.qr_csv_column_combo, 5, 1)
         
         self.layout.addWidget(self.qr_group)
         
@@ -184,7 +184,7 @@ class PropertyPanel(QWidget):
         self.text_content_input = QLineEdit()
         
         self.text_batch_checkbox = QCheckBox("批量生成")
-        self.text_csv_column_label = QLabel("CSV列:")
+        self.text_csv_column_label = QLabel("关联导入数据列:")
         self.text_csv_column_combo = QComboBox()
         
         self.text_layout.addWidget(self.font_label, 0, 0)
@@ -229,11 +229,16 @@ class PropertyPanel(QWidget):
         self.text_group.setVisible(show)
         self.qr_group.setVisible(not show)
     
-    def update_csv_columns(self, columns):
-        """更新CSV列选择"""
-        self.csv_column_combo.clear()
-        self.csv_column_combo.addItems(columns)
+    def update_qr_csv_columns(self, columns):
+        """更新二维码CSV列选择"""
+        self.qr_csv_column_combo.clear()
+        self.qr_csv_column_combo.addItems(columns)
+    
+    def update_text_csv_columns(self, columns):
+        """更新文本CSV列选择"""
         self.text_csv_column_combo.clear()
+        # 添加一个空字符串选项，用于表示未选择任何列
+        self.text_csv_column_combo.addItem("")
         self.text_csv_column_combo.addItems(columns)
     
     def update_capacity(self, numeric, alphanumeric, byte, kanji):
@@ -410,7 +415,7 @@ class CSVPreviewDialog(QDialog):
     def update_preview(self):
         """更新预览数据"""
         start_row = self.start_row_input.value()
-        data = self.csv_handler.get_preview_data(start_row, 5)
+        data = self.csv_handler.get_preview_data(start_row, 10)
         
         if data is not None:
             # 清空表格并重新设置

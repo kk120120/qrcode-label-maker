@@ -306,7 +306,8 @@
                 <ul>
                     <li><strong>show_qr_properties()：</strong>显示二维码属性</li>
                     <li><strong>show_text_properties()：</strong>显示文本属性</li>
-                    <li><strong>update_csv_columns()：</strong>更新CSV列选择</li>
+                    <li><strong>update_qr_csv_columns()：</strong>更新二维码CSV列选择</li>
+                    <li><strong>update_text_csv_columns()：</strong>更新文本CSV列选择</li>
                     <li><strong>update_capacity()：</strong>更新二维码容量显示</li>
                 </ul>
                 
@@ -415,6 +416,34 @@
         </div>
         
         <h2>5. 版本差异</h2>
+        
+        <h3>v0.7.9 vs v0.7.8</h3>
+        
+        <div class="optimization-log">
+            <h4>新增功能</h4>
+            <ul>
+                <li>在状态栏实时显示鼠标坐标</li>
+                <li>在设计区左上角添加坐标原点 (0,0) 标记</li>
+                <li>增加 CSV/Excel 预览行数从 5 行到 10 行</li>
+                <li>为“csv批量导入”菜单项添加状态提示</li>
+            </ul>
+        </div>
+        
+        <div class="bug-log">
+            <h4>Bug 修复</h4>
+            <ul>
+                <li>修复文本对象 CSV 列选择互相覆盖的问题</li>
+                <li>修复点击检测的坐标系问题</li>
+            </ul>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>界面优化</h4>
+            <ul>
+                <li>锁定属性面板宽度，保持界面布局稳定</li>
+                <li>优化属性更新逻辑，减少信号连接操作</li>
+            </ul>
+        </div>
         
         <h3>v0.7.8 vs v0.7.5</h3>
         
@@ -542,6 +571,20 @@
             <p><strong>解决方案：</strong>修改批量生成逻辑，在点击开始按钮后才创建和显示进度窗</p>
         </div>
         
+        <div class="bug-log">
+            <h4>11. 文本对象CSV列选择互相覆盖</h4>
+            <p><strong>问题：</strong>当在不同文本对象之间切换时，后一个对象的CSV列值会被前一个对象的设置覆盖</p>
+            <p><strong>原因：</strong>每次更新属性面板时都会重置CSV列下拉框选项，导致选中项被重置</p>
+            <p><strong>解决方案：</strong>修改update_property_panel方法，只有当下拉框为空时才更新选项，避免每次都重置下拉框</p>
+        </div>
+        
+        <div class="bug-log">
+            <h4>12. 点击检测坐标系问题</h4>
+            <p><strong>问题：</strong>用户视觉上点击对象，但系统认为未点击对象</p>
+            <p><strong>原因：</strong>坐标计算不一致，paintEvent中使用了平移，而mousePressEvent中没有考虑平移的影响</p>
+            <p><strong>解决方案：</strong>统一坐标计算方法，在mousePressEvent中考虑平移偏移的影响</p>
+        </div>
+        
         <h3>优化日志</h3>
         <div class="optimization-log">
             <h4>1. 拖动对象时实时更新属性面板</h4>
@@ -595,6 +638,36 @@
             <h4>9. 优化批量生成进度窗</h4>
             <p><strong>优化内容：</strong>在点击开始按钮后才显示进度窗，提高用户体验</p>
             <p><strong>效果：</strong>进度窗在批量生成开始时才显示，符合用户预期</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>10. 优化属性更新逻辑</h4>
+            <p><strong>优化内容：</strong>统一文本对象和QR对象的属性更新逻辑，只有当下拉框为空时才更新选项，避免每次都重置下拉框</p>
+            <p><strong>效果：</strong>在不同对象之间切换时，每个对象都会保持其自己的CSV列设置，不再出现属性互相覆盖的问题</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>11. 统一坐标计算方法</h4>
+            <p><strong>优化内容：</strong>在mousePressEvent中考虑平移偏移的影响，确保坐标计算与paintEvent一致</p>
+            <p><strong>效果：</strong>用户视觉上点击对象时，系统能够正确识别为点击了对象</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>12. 增加鼠标坐标显示</h4>
+            <p><strong>优化内容：</strong>在状态栏实时显示鼠标在设计区中的坐标（以毫米为单位）</p>
+            <p><strong>效果：</strong>用户可以更准确地了解鼠标位置，方便精确定位对象</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>13. 增加坐标原点标记</h4>
+            <p><strong>优化内容：</strong>在设计区左上角添加红色十字标记和"(0,0)"文本</p>
+            <p><strong>效果：</strong>用户可以更直观地理解坐标系统的原点位置</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>14. 锁定属性面板宽度</h4>
+            <p><strong>优化内容：</strong>设置属性面板的最小和最大宽度为300像素</p>
+            <p><strong>效果：</strong>选择不同对象时属性区宽度不会变化，保持界面布局的稳定性</p>
         </div>
     </div>
     
