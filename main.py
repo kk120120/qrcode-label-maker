@@ -1035,6 +1035,7 @@ class MainWindow(QMainWindow):
                 pass
 
             elif obj['type'] == 'qr':
+                pass
 
 
         
