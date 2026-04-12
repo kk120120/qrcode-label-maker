@@ -260,12 +260,11 @@ class LabelDesigner(QWidget):
 
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        print(f"[调试] 执行函数: LabelDesigner.mousePressEvent")
-        print(f"[调试] 操作: 鼠标按下，按钮={event.button()}")
+
         
         if event.button() == Qt.MouseButton.MiddleButton:
             # 开始平移
-            print(f"[调试] 操作: 开始平移")
+
             self.is_panning = True
             self.pan_start = event.pos()
             # 鼠标指针变为手型
@@ -282,7 +281,7 @@ class LabelDesigner(QWidget):
             # 检查是否点击了对象
             clicked_obj = None
             objects = self.template.get_objects()
-            print(f"[调试] 模板中的对象数量: {len(objects)}")
+
             
             # 获取原始鼠标位置
             raw_mouse_x = event.pos().x()
@@ -302,11 +301,7 @@ class LabelDesigner(QWidget):
             adjusted_mouse_x = raw_mouse_x - x_offset - self.pan_offset.x()
             adjusted_mouse_y = raw_mouse_y - y_offset - self.pan_offset.y()
             
-            print(f"[调试] 原始鼠标位置: x={raw_mouse_x}, y={raw_mouse_y}")
-            print(f"[调试] 缩放比例: {scale}")
-            print(f"[调试] 偏移: x_offset={x_offset}, y_offset={y_offset}")
-            print(f"[调试] 平移: pan_offset.x={self.pan_offset.x()}, pan_offset.y={self.pan_offset.y()}")
-            print(f"[调试] 调整后的鼠标位置: x={adjusted_mouse_x}, y={adjusted_mouse_y}")
+
             
             # 从后往前遍历，确保上层对象先被检测
             for i in reversed(range(len(objects))):
@@ -324,24 +319,20 @@ class LabelDesigner(QWidget):
                 obj_bottom = obj_y + obj_height
                 
                 # 打印对象边界信息
-                print(f"[调试] 对象 {i} - ID: {obj['id']}, 类型: {obj['type']}")
-                print(f"[调试] 对象位置: x={obj['position']['x']}, y={obj['position']['y']}")
-                print(f"[调试] 对象大小: width={obj['size']['width']}, height={obj['size']['height']}")
-                print(f"[调试] 边界（像素）: 左={obj_left}, 上={obj_top}, 右={obj_right}, 下={obj_bottom}")
-                print(f"[调试] 调整后的鼠标位置: x={adjusted_mouse_x}, y={adjusted_mouse_y}")
-                print(f"[调试] 鼠标是否在范围内: x={obj_left <= adjusted_mouse_x <= obj_right}, y={obj_top <= adjusted_mouse_y <= obj_bottom}")
+
                 
                 # 检查鼠标是否在对象范围内
                 if obj_left <= adjusted_mouse_x <= obj_right and obj_top <= adjusted_mouse_y <= obj_bottom:
                     clicked_obj = obj
-                    print(f"[调试] 点击了对象: ID={obj['id']}, 类型={obj['type']}, CSV列={obj['properties'].get('csv_column', 'None')}")
+
                     break
             
             if clicked_obj:
                 # 设置选中对象
-                print(f"[调试] 设置选中对象: {clicked_obj['id']}")
+
                 self.selected_object = clicked_obj['id']
-                # 暂时不设置is_dragging，只有在鼠标移动时才设置
+                # 设置拖动状态
+                self.is_dragging = True
                 self.drag_start = event.pos()
                 # 强制重绘
                 self.update()
@@ -349,25 +340,25 @@ class LabelDesigner(QWidget):
                 
                 # 直接调用主窗口的update_property_panel方法
                 if self.parent() and hasattr(self.parent(), 'update_property_panel'):
-                    print(f"[调试] 调用者: LabelDesigner.mousePressEvent - 调用主窗口的update_property_panel")
+
                     self.parent().update_property_panel()
                     print("===========================================")
                 else:
                     # 尝试通过其他方式获取主窗口
                     main_window = self.window()
                     if main_window and hasattr(main_window, 'update_property_panel'):
-                        print(f"[调试] 调用者: LabelDesigner.mousePressEvent - 通过window()调用update_property_panel")
+
                         main_window.update_property_panel()
-                        print("===========================================")
+
             else:
                 # 未点击对象，取消选择
-                print(f"[调试] 未点击对象，取消选择")
+
                 self.selected_object = None
                 # 强制重绘
                 self.update()
                 # 通知主窗口更新属性面板
                 if hasattr(self.parent(), 'update_property_panel'):
-                    print(f"[调试] 调用主窗口的update_property_panel (取消选择)")
+
                     self.parent().update_property_panel()
     
     def mouseMoveEvent(self, event):
@@ -894,7 +885,7 @@ class MainWindow(QMainWindow):
         y = (label_height - 10) / 2
         obj_id = self.designer.add_qr_object(x, y)
         self.property_panel.show_qr_properties()
-        print(f"[调试] 调用者: MainWindow.on_qr_button_clicked - 调用update_property_panel")
+
         self.update_property_panel()
         
         # 记录操作历史
@@ -918,7 +909,7 @@ class MainWindow(QMainWindow):
             import copy
             self.record_history("add", {"obj_id": obj_id, "obj_data": copy.deepcopy(obj)})
         self.property_panel.show_text_properties()
-        print(f"[调试] 调用者: MainWindow.on_text_button_clicked - 调用update_property_panel")
+
         self.update_property_panel()
     
     def on_save_properties(self):
@@ -1013,15 +1004,15 @@ class MainWindow(QMainWindow):
         import inspect
         caller_frame = inspect.currentframe().f_back
         caller_function = inspect.getframeinfo(caller_frame).function
-        print(f"[调试] 执行函数: MainWindow.update_property_panel")
-        print(f"[调试] 调用者: {caller_function}")
+
+
         # 强制获取最新的选中对象
         selected_id = self.designer.selected_object
-        print(f"[调试] 选中的对象 ID: {selected_id}")
+
         
         # 直接从模板中获取对象，而不是通过get_selected_object
         objects = self.designer.template.get_objects()
-        print(f"[调试] 模板中的对象数量: {len(objects)}")
+
         
         obj = None
         for o in objects:
@@ -1033,19 +1024,19 @@ class MainWindow(QMainWindow):
         batch_status = False
         
         if obj:
-            print(f"[调试] 找到的对象 ID: {obj['id']}")
-            print(f"[调试] 对象类型: {obj['type']}")
+
+
             
             # 提前获取CSV列值和批量生成状态，以防后续操作影响
             csv_column_from_obj = obj['properties'].get('csv_column', '')
             batch_status = obj['properties'].get('batch', False)
             
             if obj['type'] == 'text':
-                print(f"[调试] 文本对象的 CSV 列: {csv_column_from_obj}")
-                print(f"[调试] 文本对象的批量生成状态: {batch_status}")
+
+
             elif obj['type'] == 'qr':
-                print(f"[调试] 二维码对象的 CSV 列: {csv_column_from_obj}")
-                print(f"[调试] 二维码对象的批量生成状态: {batch_status}")
+
+
         
         if obj:
             # 查找对象在列表中的索引
@@ -1058,7 +1049,7 @@ class MainWindow(QMainWindow):
             # 更新对象信息标签
             obj_type = "QR" if obj['type'] == 'qr' else "Text"
             self.property_panel.object_info_label.setText(f"选中对象: {obj_type} #{obj_index}")
-            print(f"[调试] 更新对象信息标签: {obj_type} #{obj_index}")
+
             
             # 强制隐藏所有属性面板，然后再显示正确的面板
             self.property_panel.qr_group.setVisible(False)
@@ -1070,11 +1061,11 @@ class MainWindow(QMainWindow):
             
             # 确保显示正确的属性面板
             if obj['type'] == 'qr':
-                print(f"[调试] 显示二维码属性面板")
+
                 self.property_panel.qr_group.setVisible(True)
                 self.property_panel.text_group.setVisible(False)
             else:
-                print(f"[调试] 显示文本属性面板")
+
                 self.property_panel.qr_group.setVisible(False)
                 self.property_panel.text_group.setVisible(True)
             
@@ -1083,7 +1074,7 @@ class MainWindow(QMainWindow):
             self.property_panel.layout.activate()
             
             # 暂时断开所有可能触发 on_save_properties 的信号连接
-            print(f"[调试] 断开所有可能触发 on_save_properties 的信号连接")
+
             
             # 断开文本样式复选框信号
             try:
@@ -1107,20 +1098,20 @@ class MainWindow(QMainWindow):
             
             # 断开批量复选框信号
             if obj['type'] == 'qr':
-                print(f"[调试] 断开二维码批量复选框的信号连接")
+
                 try:
                     self.property_panel.qr_batch_checkbox.stateChanged.disconnect(self.on_batch_checkbox_changed)
                 except:
                     pass
             elif obj['type'] == 'text':
-                print(f"[调试] 断开文本批量复选框的信号连接")
+
                 try:
                     self.property_panel.text_batch_checkbox.stateChanged.disconnect(self.on_text_batch_checkbox_changed)
                 except:
                     pass
             
             # 更新基本属性
-            print(f"[调试] 更新基本属性")
+
             self.property_panel.x_input.setValue(obj['position']['x'])
             self.property_panel.y_input.setValue(obj['position']['y'])
             self.property_panel.width_input.setValue(obj['size']['width'])
@@ -1128,7 +1119,7 @@ class MainWindow(QMainWindow):
             
             if obj['type'] == 'qr':
                 # 更新二维码属性
-                print(f"[调试] 更新二维码属性")
+
                 self.property_panel.qr_version_combo.setCurrentText(obj['properties']['qr_version'])
                 self.property_panel.error_correction_combo.setCurrentText(obj['properties']['error_correction'])
                 self.property_panel.content_input.setText(obj['properties']['content'])
@@ -1136,7 +1127,7 @@ class MainWindow(QMainWindow):
                 
                 # 更新CSV列选择
                 columns = self.csv_handler.get_columns()
-                print(f"[调试] 二维码对象 - CSV列: {csv_column_from_obj}")
+
                 
                 # 只有当下拉框为空时才更新选项，避免每次都重置下拉框
                 if self.property_panel.qr_csv_column_combo.count() == 0:
@@ -1156,11 +1147,11 @@ class MainWindow(QMainWindow):
                 )
                 
                 # 重新连接二维码批量复选框的信号
-                print(f"[调试] 重新连接二维码批量复选框的信号")
+
                 self.property_panel.qr_batch_checkbox.stateChanged.connect(self.on_batch_checkbox_changed)
                 
                 # 重新连接所有信号
-                print(f"[调试] 重新连接所有信号")
+
                 # 重新连接文本样式复选框信号
                 self.property_panel.bold_checkbox.stateChanged.connect(self.on_save_properties)
                 self.property_panel.italic_checkbox.stateChanged.connect(self.on_save_properties)
@@ -1175,7 +1166,7 @@ class MainWindow(QMainWindow):
                 self.property_panel.font_size_input.editingFinished.connect(self.on_save_properties)
             elif obj['type'] == 'text':
                 # 更新文本属性
-                print(f"[调试] 更新文本属性")
+
                 self.property_panel.font_combo.setCurrentText(obj['properties']['font'])
                 self.property_panel.font_size_input.setValue(obj['properties']['font_size'])
                 
@@ -1191,42 +1182,42 @@ class MainWindow(QMainWindow):
                 
                 # 更新CSV列选择
                 columns = self.csv_handler.get_columns()
-                print(f"[调试] 文本对象 #{obj_index} - 可用的CSV列: {columns}")
-                print(f"[调试] 文本对象 #{obj_index} - 从对象获取的CSV列: {csv_column_from_obj}")
+
+
                 
                 # 保存当前CSV列值
                 current_csv_column = csv_column_from_obj
-                print(f"[调试] 文本对象 #{obj_index} - 保存当前CSV列值: {current_csv_column}")
+
                 
                 # 只有当下拉框为空时才更新选项，避免每次都重置下拉框
                 if self.property_panel.text_csv_column_combo.count() == 0:
-                    print(f"[调试] 更新文本CSV列选择")
+
                     self.property_panel.update_text_csv_columns(columns)
                 
                 # 根据批量生成状态启用/禁用CSV列选择，并设置相应的值
                 if batch_status:
-                    print(f"[调试] 文本对象 #{obj_index} - 批量生成已启用，设置CSV列选择")
+
                     self.property_panel.text_csv_column_combo.setEnabled(True)
                     # 只有当csv_column不为空且在列列表中时才设置
                     if current_csv_column and current_csv_column in columns:
-                        print(f"[调试] 文本对象 #{obj_index} - 设置CSV列为: {current_csv_column}")
+
                         self.property_panel.text_csv_column_combo.setCurrentText(current_csv_column)
                     else:
                         # 如果csv_column为空或不在列列表中，设置为空字符串
-                        print(f"[调试] 文本对象 #{obj_index} - CSV列不在列表中，设置为空字符串")
+
                         self.property_panel.text_csv_column_combo.setCurrentText("")
                 else:
-                    print(f"[调试] 文本对象 #{obj_index} - 批量生成已禁用，禁用CSV列选择")
+
                     self.property_panel.text_csv_column_combo.setEnabled(False)
                     # 当批量生成禁用时，强制设置为空字符串
                     self.property_panel.text_csv_column_combo.setCurrentText("")
                 
                 # 重新连接文本批量复选框的信号
-                print(f"[调试] 文本对象 #{obj_index} - 重新连接文本批量复选框的信号")
+
                 self.property_panel.text_batch_checkbox.stateChanged.connect(self.on_text_batch_checkbox_changed)
                 
                 # 重新连接所有信号
-                print(f"[调试] 重新连接所有信号")
+
                 # 重新连接文本样式复选框信号
                 self.property_panel.bold_checkbox.stateChanged.connect(self.on_save_properties)
                 self.property_panel.italic_checkbox.stateChanged.connect(self.on_save_properties)
@@ -1241,7 +1232,7 @@ class MainWindow(QMainWindow):
                 self.property_panel.font_size_input.editingFinished.connect(self.on_save_properties)
         else:
             # 未选择对象时更新标签
-            print(f"[调试] 未选择对象，更新标签")
+
             self.property_panel.object_info_label.setText("未选择对象")
             # 隐藏所有属性面板
             self.property_panel.qr_group.setVisible(False)
@@ -1306,7 +1297,7 @@ class MainWindow(QMainWindow):
                 self.record_history("delete", {"obj_id": self.designer.selected_object, "obj_data": copy.deepcopy(obj)})
             
             self.designer.remove_selected_object()
-            print(f"[调试] 调用者: MainWindow.delete_selected - 调用update_property_panel")
+
             self.update_property_panel()
             self.statusBar.showMessage("已删除选中对象")
     
@@ -1515,7 +1506,7 @@ class MainWindow(QMainWindow):
             
             self.designer.selected_object = None
             self.designer.update()
-            print(f"[调试] 调用者: MainWindow.undo - 调用update_property_panel")
+
             self.update_property_panel()
             self.update_history_buttons()
             self.statusBar.showMessage("已回退操作")
@@ -1544,7 +1535,7 @@ class MainWindow(QMainWindow):
             
             self.designer.selected_object = None
             self.designer.update()
-            print(f"[调试] 调用者: MainWindow.redo - 调用update_property_panel")
+
             self.update_property_panel()
             self.update_history_buttons()
             self.statusBar.showMessage("已重做操作")
