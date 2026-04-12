@@ -1032,7 +1032,7 @@ class MainWindow(QMainWindow):
             batch_status = obj['properties'].get('batch', False)
             
             if obj['type'] == 'text':
-
+                pass
 
             elif obj['type'] == 'qr':
 
