@@ -2,3 +2,5 @@ PyQt5
 qrcode[pil]
 Pillow
 pandas
+openpyxl
+python-calamine

@@ -146,12 +146,14 @@ class ImageProcessor:
         label_img.save(filename)
         return filename
     
-    def batch_process(self, template, csv_data, output_dir):
+    def batch_process(self, template, csv_data, output_dir, export_format="png", pdf_filename=None):
         """批量处理生成标签"""
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         
         results = []
+        images = []
+        
         for i, row in csv_data.iterrows():
             # 创建标签
             label_img = self.create_label(
@@ -220,16 +222,55 @@ class ImageProcessor:
                         template['dpi']
                     )
             
-            # 保存文件
-            # 使用二维码内容前12个字符作为文件名
-            if qr_content:
-                filename = qr_content[:12] + '.png'
-            else:
-                filename = 'noQR_{}.png'.format(i)
+            if export_format == "png":
+                # 保存为PNG文件
+                # 使用二维码内容前20个字符作为文件名
+                if qr_content:
+                    filename = qr_content[:20] + '.png'
+                else:
+                    filename = 'noQR_{}.png'.format(i)
+                
+                filepath = os.path.join(output_dir, filename)
+                self.save_label(label_img, filepath)
+                results.append(filepath)
+            else:  # PDF格式
+                # 收集图像用于合并为PDF
+                images.append(label_img)
+        
+        if export_format == "pdf" and images:
+            # 保存为PDF文件
+            if not pdf_filename:
+                pdf_filename = "labels.pdf"
+            elif not pdf_filename.endswith('.pdf'):
+                pdf_filename += '.pdf'
             
-            filepath = os.path.join(output_dir, filename)
-            self.save_label(label_img, filepath)
-            results.append(filepath)
+            pdf_path = os.path.join(output_dir, pdf_filename)
+            
+            # 保存为PDF
+            if images:
+                # 将图像转换为RGB模式（PDF不支持RGBA）
+                rgb_images = []
+                for img in images:
+                    if img.mode == 'RGBA':
+                        # 创建白色背景
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        background.paste(img, mask=img.split()[3])  # 使用alpha通道作为mask
+                        rgb_images.append(background)
+                    elif img.mode != 'RGB':
+                        rgb_images.append(img.convert('RGB'))
+                    else:
+                        rgb_images.append(img)
+                
+                # 第一个图像作为第一页
+                # 使用两倍的DPI以提高PDF清晰度，最大不超过800DPI
+                pdf_dpi = min(template['dpi'] * 2, 800)
+                rgb_images[0].save(
+                    pdf_path,
+                    save_all=True,
+                    append_images=rgb_images[1:],
+                    resolution=pdf_dpi
+                )
+                results.append(pdf_path)
         
         return results
 

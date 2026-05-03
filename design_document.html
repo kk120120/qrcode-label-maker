@@ -124,7 +124,7 @@
         
         <h2>1. 项目概述</h2>
         <p>本项目是一个用于生成批量二维码标签的工具，支持自定义标签大小、二维码属性和文本属性，并能通过CSV导入数据进行批量生成。</p>
-        <p><strong>版本：</strong>v0.7.2</p>
+        <p><strong>版本：</strong>v0.7.8</p>
         <p><strong>GitHub 项目地址：</strong><a href="https://github.com/kk120120/qrcode-label-maker" target="_blank">https://github.com/kk120120/qrcode-label-maker</a></p>
         
         <h2>2. 模块互动流程图</h2>
@@ -194,14 +194,22 @@
                 
                 <h4>主要方法：</h4>
                 <ul>
-                    <li><strong>init_ui()：</strong>初始化用户界面</li>
-                    <li><strong>open_basic_settings()：</strong>打开基础设置对话框</li>
+                    <li><strong>init_ui()：</strong>初始化用户界面，默认开启网格显示</li>
+                    <li><strong>open_basic_settings()：</strong>打开基础设置对话框，支持网格颜色设置</li>
                     <li><strong>on_qr_button_clicked()：</strong>处理二维码按钮点击事件</li>
                     <li><strong>on_text_button_clicked()：</strong>处理文本按钮点击事件</li>
                     <li><strong>on_save_properties()：</strong>保存对象属性</li>
                     <li><strong>update_property_panel()：</strong>更新属性面板</li>
                     <li><strong>export_current()：</strong>导出当前标签</li>
                     <li><strong>batch_export()：</strong>批量导出标签</li>
+                    <li><strong>show_about()：</strong>显示关于对话框，使用版本信息常量</li>
+                </ul>
+                
+                <h4>新增功能：</h4>
+                <ul>
+                    <li>默认开启绘图区网格显示</li>
+                    <li>添加“新建”菜单快捷键 Ctrl+N</li>
+                    <li>为应用程序窗口添加二维码样式图标</li>
                 </ul>
                 
                 <h4>触发条件：</h4>
@@ -224,7 +232,7 @@
                 
                 <h4>主要方法：</h4>
                 <ul>
-                    <li><strong>paintEvent()：</strong>绘制标签和对象，包括对象类型简称和序号</li>
+                    <li><strong>paintEvent()：</strong>绘制标签和对象，包括对象类型简称和序号，使用grid_color属性绘制网格</li>
                     <li><strong>mousePressEvent()：</strong>处理鼠标按下事件，更新选中对象和属性面板</li>
                     <li><strong>mouseMoveEvent()：</strong>处理鼠标移动事件，实现对象拖动</li>
                     <li><strong>mouseReleaseEvent()：</strong>处理鼠标释放事件</li>
@@ -232,6 +240,11 @@
                     <li><strong>add_qr_object()：</strong>添加二维码对象</li>
                     <li><strong>add_text_object()：</strong>添加文本对象</li>
                     <li><strong>update_object_properties()：</strong>更新对象属性</li>
+                </ul>
+                
+                <h4>新增属性：</h4>
+                <ul>
+                    <li><strong>grid_color：</strong>网格颜色，默认为QColor(180, 180, 180)</li>
                 </ul>
                 
                 <h4>触发条件：</h4>
@@ -293,7 +306,8 @@
                 <ul>
                     <li><strong>show_qr_properties()：</strong>显示二维码属性</li>
                     <li><strong>show_text_properties()：</strong>显示文本属性</li>
-                    <li><strong>update_csv_columns()：</strong>更新CSV列选择</li>
+                    <li><strong>update_qr_csv_columns()：</strong>更新二维码CSV列选择</li>
+                    <li><strong>update_text_csv_columns()：</strong>更新文本CSV列选择</li>
                     <li><strong>update_capacity()：</strong>更新二维码容量显示</li>
                 </ul>
                 
@@ -401,7 +415,99 @@
             </ul>
         </div>
         
-        <h2>5. Bug和优化日志</h2>
+        <h2>5. 版本差异</h2>
+        
+        <h3>v0.7.9 vs v0.7.8</h3>
+        
+        <div class="optimization-log">
+            <h4>新增功能</h4>
+            <ul>
+                <li>在状态栏实时显示鼠标坐标</li>
+                <li>在设计区左上角添加坐标原点 (0,0) 标记</li>
+                <li>增加 CSV/Excel 预览行数从 5 行到 10 行</li>
+                <li>为“csv批量导入”菜单项添加状态提示</li>
+            </ul>
+        </div>
+        
+        <div class="bug-log">
+            <h4>Bug 修复</h4>
+            <ul>
+                <li>修复文本对象 CSV 列选择互相覆盖的问题</li>
+                <li>修复点击检测的坐标系问题</li>
+                <li>修复对象不能拖动调整位置的问题</li>
+            </ul>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>界面优化</h4>
+            <ul>
+                <li>锁定属性面板宽度，保持界面布局稳定</li>
+                <li>优化属性更新逻辑，减少信号连接操作</li>
+            </ul>
+        </div>
+        
+        <h3>v0.7.8 vs v0.7.5</h3>
+        
+        <div class="optimization-log">
+            <h4>新增功能</h4>
+            <ul>
+                <li>默认开启绘图区网格显示</li>
+                <li>添加“新建”菜单快捷键 Ctrl+N</li>
+                <li>为应用程序窗口添加二维码样式图标</li>
+                <li>为打包的 exe 文件添加二维码样式图标</li>
+                <li>在基础设置中添加网格线颜色设置功能</li>
+            </ul>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>代码优化</h4>
+            <ul>
+                <li>在 main.py 文件开头添加版本信息常量</li>
+                <li>修改 show_about 方法，使用常量而不是硬编码值</li>
+                <li>修复 f-string 语法错误</li>
+            </ul>
+        </div>
+        
+        <h3>v0.7.5 vs v0.7.2</h3>
+        
+        <div class="optimization-log">
+            <h3>新增功能</h3>
+            <ul>
+                <li>添加网格显示功能，支持5mmx5mm的虚线网格</li>
+                <li>实现绘图区的放大缩小功能（Ctrl+鼠标滚轮），限制范围为30%-300%</li>
+                <li>实现绘图区的平移功能（鼠标中键拖拽）</li>
+                <li>在状态栏显示放大倍数</li>
+                <li>在基础设置中添加网格线颜色设置选项</li>
+                <li>添加批量导出为PDF格式的功能</li>
+                <li>添加Excel文件导入功能</li>
+                <li>添加撤销/重做功能，记录最近8次操作</li>
+                <li>添加键盘Delete键删除对象的功能</li>
+                <li>添加文件菜单中的“保存”选项，支持快捷键Ctrl+S</li>
+            </ul>
+        </div>
+        
+        <div class="optimization-log">
+            <h3>界面优化</h3>
+            <ul>
+                <li>调整菜单结构，去掉“编辑”菜单，将“帮助”菜单靠左移位</li>
+                <li>在“帮助”菜单右侧添加“回退”和“重做”按钮</li>
+                <li>扩大左侧绘制区，减少与属性区的间距</li>
+                <li>修改标签尺寸输入限制，将宽度和高度的最大值都设置为300mm</li>
+                <li>鼠标中键按下时显示手型指针，提示可以移动标签</li>
+            </ul>
+        </div>
+        
+        <div class="bug-log">
+            <h3>Bug 修复</h3>
+            <ul>
+                <li>修复CSVPreviewDialog预览数据不更新的问题</li>
+                <li>修复文本对象字体导致编号字体变大的问题</li>
+                <li>修复PDF导出时的JPEG相关错误</li>
+                <li>修复QPointF未定义的错误</li>
+            </ul>
+        </div>
+        
+        <h2>6. Bug和优化日志</h2>
         
         <h3>Bug 日志</h3>
         <div class="bug-log">
@@ -466,6 +572,20 @@
             <p><strong>解决方案：</strong>修改批量生成逻辑，在点击开始按钮后才创建和显示进度窗</p>
         </div>
         
+        <div class="bug-log">
+            <h4>11. 文本对象CSV列选择互相覆盖</h4>
+            <p><strong>问题：</strong>当在不同文本对象之间切换时，后一个对象的CSV列值会被前一个对象的设置覆盖</p>
+            <p><strong>原因：</strong>每次更新属性面板时都会重置CSV列下拉框选项，导致选中项被重置</p>
+            <p><strong>解决方案：</strong>修改update_property_panel方法，只有当下拉框为空时才更新选项，避免每次都重置下拉框</p>
+        </div>
+        
+        <div class="bug-log">
+            <h4>12. 点击检测坐标系问题</h4>
+            <p><strong>问题：</strong>用户视觉上点击对象，但系统认为未点击对象</p>
+            <p><strong>原因：</strong>坐标计算不一致，paintEvent中使用了平移，而mousePressEvent中没有考虑平移的影响</p>
+            <p><strong>解决方案：</strong>统一坐标计算方法，在mousePressEvent中考虑平移偏移的影响</p>
+        </div>
+        
         <h3>优化日志</h3>
         <div class="optimization-log">
             <h4>1. 拖动对象时实时更新属性面板</h4>
@@ -519,6 +639,36 @@
             <h4>9. 优化批量生成进度窗</h4>
             <p><strong>优化内容：</strong>在点击开始按钮后才显示进度窗，提高用户体验</p>
             <p><strong>效果：</strong>进度窗在批量生成开始时才显示，符合用户预期</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>10. 优化属性更新逻辑</h4>
+            <p><strong>优化内容：</strong>统一文本对象和QR对象的属性更新逻辑，只有当下拉框为空时才更新选项，避免每次都重置下拉框</p>
+            <p><strong>效果：</strong>在不同对象之间切换时，每个对象都会保持其自己的CSV列设置，不再出现属性互相覆盖的问题</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>11. 统一坐标计算方法</h4>
+            <p><strong>优化内容：</strong>在mousePressEvent中考虑平移偏移的影响，确保坐标计算与paintEvent一致</p>
+            <p><strong>效果：</strong>用户视觉上点击对象时，系统能够正确识别为点击了对象</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>12. 增加鼠标坐标显示</h4>
+            <p><strong>优化内容：</strong>在状态栏实时显示鼠标在设计区中的坐标（以毫米为单位）</p>
+            <p><strong>效果：</strong>用户可以更准确地了解鼠标位置，方便精确定位对象</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>13. 增加坐标原点标记</h4>
+            <p><strong>优化内容：</strong>在设计区左上角添加红色十字标记和"(0,0)"文本</p>
+            <p><strong>效果：</strong>用户可以更直观地理解坐标系统的原点位置</p>
+        </div>
+        
+        <div class="optimization-log">
+            <h4>14. 锁定属性面板宽度</h4>
+            <p><strong>优化内容：</strong>设置属性面板的最小和最大宽度为300像素</p>
+            <p><strong>效果：</strong>选择不同对象时属性区宽度不会变化，保持界面布局的稳定性</p>
         </div>
     </div>
     
