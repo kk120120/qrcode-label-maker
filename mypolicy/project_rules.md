@@ -1,0 +1,530 @@
+# AI编程项目规则
+
+> **适用范围**：本项目（QR标签生成器）及类似架构的Python GUI项目
+> **参考来源**：Trae四层架构、Cursor项目规则最佳实践、AI辅助编程分层设计
+
+***
+
+## 一、项目架构规范
+
+### 1.1 四层架构铁律（强制执行）
+
+```
+main.py (总入口)
+    ↓
+L1 入口层 (entry/)
+    ↓
+L2 调度层 (schedule/)
+    ↓
+L3 分子层 (molecule/)
+    ↓
+L4 原子层 (atom/)
+```
+
+**依赖方向**：只能单向调用，禁止反向、禁止跨层、禁止分子调分子
+
+### 例外情况:
+
+1. 对于简单项目或比较简单的功能,可以合并L1和L2层,减少项目复杂度. L3/L4层, 不可以合并.
+
+<br />
+
+***
+
+## 二、各层职责详解
+
+### 2.1 main.py - 总入口
+
+**职责**：
+
+- ✅ 环境准备（日志、配置、路径）
+- ✅ 检查依赖
+- ✅ 调用 L1 启动UI
+- ✅ 程序退出时清理
+
+**绝对禁止**：
+
+- ❌ 创建窗口
+- ❌ 配置菜单/按钮
+- ❌ 写业务逻辑
+- ❌ 直接调用分子/原子
+
+**代码示例**：
+
+```python
+def main():
+    logger.info("程序启动")
+    # 检查依赖
+    if not check_dependencies():
+        sys.exit(1)
+    # 加载配置
+    config = load_config()
+    # 创建应用
+    app = QApplication(sys.argv)
+    # 调用L1
+    from entry.entry_main import EntryMain
+    entry_main = EntryMain()
+    window = entry_main.create_main_window()
+    window.show()
+    # 启动消息循环
+    exit_code = app.exec_()
+    # 清理
+    save_config(config)
+    return exit_code
+```
+
+***
+
+### 2.2 L1 入口层 (entry/)
+
+**职责**：
+
+- ✅ 接收用户事件（点击、按键等）
+- ✅ 转发给 L2 调度层
+- ✅ 不写任何业务逻辑
+
+**命名规范**：`entry_功能_动作()`
+
+**代码示例**：
+
+```python
+# entry/entry_ui.py
+class UIEntry:
+    def entry_add_qr_object(self, x: float, y: float) -> str:
+        """入口：添加二维码对象"""
+        return self.scheduler.schedule_add_qr_object(x, y)
+```
+
+**UI窗口子层 (entry/ui\_window/)**：
+
+- 每个UI组件独立成文件
+- 只负责UI交互，通过 entry\_ui.py 转发请求
+- 禁止直接调用调度层或分子层
+
+***
+
+### 2.3 L2 调度层 (schedule/)
+
+**职责**：
+
+- ✅ 事件 → 分子执行顺序
+- ✅ 只调度分子，不实现业务逻辑
+- ✅ 决定先后顺序、联动、异常流转
+
+**命名规范**：`schedule_事件名称()`
+
+**代码示例**：
+
+```python
+# schedule/schedule_core.py
+class CoreScheduler:
+    def schedule_add_qr_object(self, x: float, y: float) -> str:
+        """调度：添加二维码对象"""
+        return self.template_manager.molecule_template_add_qr_object(x, y)
+```
+
+***
+
+### 2.4 L3 分子层 (molecule/)
+
+**职责**：
+
+- ✅ 一个分子 = 一个完整业务动作
+- ✅ 只编排原子，不实现底层逻辑
+- ✅ 可以有 if/else（仅自身流程）
+
+**禁止**：
+
+- ❌ 调用其他分子
+- ❌ 调用调度层
+- ❌ 做全局决策
+
+**命名规范**：`molecule_业务_动作()`
+
+**代码示例**：
+
+```python
+# molecule/molecule_template.py
+class TemplateManager:
+    def molecule_template_add_qr_object(self, x: float, y: float) -> str:
+        """分子：添加二维码对象到模板"""
+        obj_id = atom_template.generate_id()
+        obj = atom_qr.create_qr_object(x, y)
+        atom_template.add_object(self.template, obj)
+        return obj_id
+```
+
+***
+
+### 2.5 L4 原子层 (atom/)
+
+**职责**：
+
+- ✅ 一个原子只做一件单一动作
+- ✅ 纯函数，无副作用
+- ✅ 函数 ≤ 80 行
+
+**禁止**：
+
+- ❌ 调用任何其他原子/分子/调度
+- ❌ 有业务逻辑（if/else分支）
+
+**命名规范**：`atom_模块_动作()`
+
+**代码示例**：
+
+```python
+# atom/atom_qr.py
+def create_qr_object(x: float, y: float, width: float = 10, height: float = 10) -> dict:
+    """原子：创建二维码对象"""
+    return {
+        'id': str(uuid.uuid4()),
+        'type': 'qr',
+        'position': {'x': x, 'y': y},
+        'size': {'width': width, 'height': height},
+        'content': '',
+        'qr_version': '21x21',
+        'error_correction': 'Q'
+    }
+```
+
+***
+
+## 三、编程范式与四层架构的结合
+
+> **核心观点**：四层架构和面向对象编程是互补关系，它们关注不同维度：
+>
+> - **四层架构** = 代码如何组织（文件/模块结构）→ 架构层
+> - **面向对象** = 类如何设计（数据+行为封装）→ 代码层
+
+### 3.1 四层架构 × 面向对象 对照表
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        L1 入口层                             │
+│  ┌─────────────────┐  ┌─────────────────┐                   │
+│  │   UIEntry       │  │   MainWindow    │  ← 类（组合UI）   │
+│  │   (转发事件)     │  │   (组装组件)     │                   │
+│  └────────┬────────┘  └─────────────────┘                   │
+└───────────┼─────────────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        L2 调度层                             │
+│  ┌─────────────────┐  ┌─────────────────┐                   │
+│  │  CoreScheduler  │  │ 调度方法         │  ← 类（协调）    │
+│  │  (协调分子)      │  │ schedule_xxx()   │                   │
+│  └────────┬────────┘  └─────────────────┘                   │
+└───────────┼─────────────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        L3 分子层                             │
+│  ┌─────────────────┐  ┌─────────────────┐                   │
+│  │ TemplateManager │  │   QRManager     │  ← 类（管理状态）  │
+│  │ molecule_xxx()  │  │ molecule_xxx()  │                   │
+│  └────────┬────────┘  └────────┬────────┘                   │
+└───────────┼────────────────────┼─────────────────────────────┘
+            │                    │
+            ▼                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        L4 原子层                             │
+│  ┌─────────────────┐  ┌─────────────────┐                   │
+│  │ 纯函数 atom_xxx │  │ 纯函数 atom_xxx │  ← 函数（无状态）  │
+│  │ (原子操作)       │  │ (原子操作)       │                   │
+│  └─────────────────┘  └─────────────────┘                   │
+└─────────────────────────────────────────────────────────────┘
+
+     ▲ 面向对象编程（OOP）  ←─────→  函数式编程（FP）
+     │    L1/L2/L3层用类              L4层用函数
+     │
+     └────────────── 四层架构（组织结构）
+```
+
+### 3.2 各层编程范式选择
+
+| 层级     | 编程范式    | 原因                | 示例                               |
+| ------ | ------- | ----------------- | -------------------------------- |
+| L4 原子层 | **纯函数** | 原子操作 = 最小功能 = 无状态 | `atom_template_create_default()` |
+| L3 分子层 | **类**   | 需要管理状态、协调多个原子     | `class TemplateManager`          |
+| L2 调度层 | **类**   | 需要协调多个分子          | `class CoreScheduler`            |
+| L1 入口层 | **类**   | 需要组装UI、管理窗口状态     | `class UIEntry`                  |
+
+### 3.3 设计原则
+
+#### 原则1：原子层用函数，分子及以上用类
+
+```python
+# ✅ L4 原子层：纯函数
+def atom_qr_create(x: float, y: float) -> dict:
+    """原子：创建二维码对象"""
+    return {
+        'id': str(uuid.uuid4())[:8],
+        'type': 'qr',
+        'position': {'x': x, 'y': y},
+        'size': {'width': 10, 'height': 10}
+    }
+
+# ✅ L3 分子层：类调用原子
+class QRManager:
+    def molecule_qr_create(self, x: float, y: float) -> str:
+        """分子：创建二维码对象"""
+        obj = atom_qr_create(x, y)  # 调用原子
+        atom_template_add_object(self.template, obj)
+        return obj['id']
+```
+
+#### 原则2：类只做编排，不做具体操作
+
+```python
+# ✅ 正确：类负责编排原子
+class TemplateManager:
+    def molecule_template_add_qr(self, x: float, y: float):
+        obj = atom_qr_create(x, y)           # 调用原子创建
+        atom_template_add_object(self.template, obj)  # 调用原子添加
+        return obj['id']
+
+# ❌ 错误：类直接实现逻辑
+class TemplateManager:
+    def molecule_template_add_qr(self, x: float, y: float):
+        obj = {
+            'id': str(uuid.uuid4())[:8],  # 直接实现
+            'type': 'qr',
+            'position': {'x': x, 'y': y}
+        }
+        self.template['objects'].append(obj)  # 直接操作
+```
+
+#### 原则3：状态集中在分子层管理
+
+```python
+class TemplateManager:
+    def __init__(self):
+        # 状态在这里集中管理
+        self.template = atom_template_create_default()
+        self.objects = []
+        self.history = []
+    
+    # 行为也在这里
+    def add_object(self, obj):
+        self.objects.append(obj)
+        self._save_history()
+```
+
+#### 原则4：继承跨层共享，组合同层协调
+
+```python
+# 继承：跨层共享行为
+class BaseManager:
+    """所有Manager的基类"""
+    def _save_history(self):
+        """通用的历史记录保存"""
+        pass
+
+class TemplateManager(BaseManager):
+    """继承基类，获取通用方法"""
+    pass
+
+# 组合：同层协调
+class CoreScheduler:
+    def __init__(self):
+        # 组合多个分子管理器
+        self.template_manager = TemplateManager()
+        self.qr_manager = QRManager()
+        self.file_manager = FileManager()
+```
+
+### 3.4 函数式 vs 面向对象的选择指南
+
+| 场景       | 推荐方式 | 原因       |
+| -------- | ---- | -------- |
+| 无状态的操作   | 纯函数  | 可测试、无副作用 |
+| 有状态需要管理  | 类    | 封装状态和行为  |
+| 需要继承共享代码 | 类继承  | 代码复用     |
+| 协调多个组件   | 组合   | 解耦和灵活性   |
+| 最小功能单元   | 纯函数  | 原子性      |
+
+### 3.5 完整调用链示例
+
+```python
+# ==================== L4 原子层（函数式） ====================
+def atom_qr_calculate_capacity(version: str, error_level: str) -> tuple:
+    """原子：计算二维码容量"""
+    capacities = {
+        ('21x21', 'L'): (17, 10, 7, 4),
+        ('21x21', 'M'): (14, 8, 6, 2),
+        # ...
+    }
+    return capacities.get((version, error_level), (0, 0, 0, 0))
+
+
+# ==================== L3 分子层（类+调用原子） ====================
+class QRManager:
+    def __init__(self):
+        self.current_version = "21x21"
+        self.error_level = "Q"
+    
+    def molecule_qr_get_capacity(self) -> tuple:
+        """分子：获取二维码容量"""
+        return atom_qr_calculate_capacity(self.current_version, self.error_level)
+
+
+# ==================== L2 调度层（类+协调分子） ====================
+class CoreScheduler:
+    def __init__(self):
+        self.qr_manager = QRManager()
+    
+    def schedule_get_qr_capacity(self) -> tuple:
+        """调度：获取二维码容量"""
+        return self.qr_manager.molecule_qr_get_capacity()
+
+
+# ==================== L1 入口层（类+转发） ====================
+class UIEntry:
+    def __init__(self):
+        self.scheduler = CoreScheduler()
+    
+    def entry_get_qr_capacity(self) -> tuple:
+        """入口：获取二维码容量"""
+        return self.scheduler.schedule_get_qr_capacity()
+```
+
+***
+
+## 四、编码规范（强制执行）
+
+### 4.1 PEP8 规范
+
+| 规范    | 要求                   |
+| ----- | -------------------- |
+| 缩进    | 4空格，禁止Tab            |
+| 行宽    | ≤ 88字符               |
+| 空行    | 函数之间空2行，类内方法空1行      |
+| 导入    | 标准库 → 第三方 → 本地，每组空1行 |
+| 命名    | 函数/变量蛇形，类大驼峰，常量全大写   |
+| 类型注解  | 所有函数必须加类型提示          |
+| 文档字符串 | Google风格，必须写功能、参数、返回 |
+
+### 3.2 命名规范详解
+
+```python
+# 函数/变量：蛇形命名
+def calculate_label_size(): ...
+user_name = "张三"
+
+# 类：大驼峰
+class LabelDesigner: ...
+
+# 常量：全大写
+MAX_RETRY = 3
+DEFAULT_WIDTH = 50
+```
+
+### 3.3 文档字符串规范
+
+```python
+"""
+功能：计算标签画布的缩放比例
+参数：
+    canvas_width: 画布宽度（像素）
+    label_width: 标签宽度（毫米）
+    dpi: 每英寸点数
+返回：缩放比例（float）
+"""
+def calculate_scale(canvas_width: int, label_width: float, dpi: int = 96) -> float:
+    # 毫米转英寸
+    inches = label_width / 25.4
+    # 计算像素宽度
+    pixel_width = inches * dpi
+    # 返回缩放比例
+    return canvas_width / pixel_width
+```
+
+### 3.4 文件头规范
+
+每个文件开头必须添加：
+
+```python
+"""
+L2 调度层 - 核心调度
+功能：事件调度、分子编排
+文件：schedule/schedule_core.py
+"""
+```
+
+***
+
+## 五、AI开发工作流
+
+### 5.1 添加新功能的标准流程
+
+1. **先在项目规则中确认架构**
+2. **从原子层开始实现**（如果需要新的原子操作）
+3. **实现分子层**（编排原子）
+4. **实现调度层**（调度分子）
+5. **实现入口层**（转发事件）
+6. **实现UI层**（用户交互）
+7. **测试完整流程**
+
+### 5.2 修改功能的标准流程
+
+1. **定位问题所在层级**（用下面的问题定位表）
+2. **只修改对应层级**，不跨层修改
+3. **保持调用链完整**
+4. **测试受影响的功能**
+
+***
+
+## 六、问题定位速查表
+
+| 问题现象    | 检查层级   | 先看哪个文件                               |
+| ------- | ------ | ------------------------------------ |
+| 按钮点击没反应 | L1 UI层 | entry/ui\_window/tool\_bar.py        |
+| 菜单功能异常  | L1 UI层 | entry/ui\_window/menu\_bar.py        |
+| 画布绘制问题  | L1 UI层 | entry/ui\_window/designer\_canvas.py |
+| 业务流程不对  | L2 调度层 | schedule/schedule\_core.py           |
+| 模板操作错误  | L3 分子层 | molecule/molecule\_template.py       |
+| 二维码生成失败 | L3 分子层 | molecule/molecule\_qr.py             |
+| 文件读写错误  | L4 原子层 | atom/atom\_file.py                   |
+| 数据结构问题  | L4 原子层 | atom/atom\_template.py               |
+
+***
+
+## 七、禁止事项（违反即重构）
+
+| 禁止事项       | 说明              |
+| ---------- | --------------- |
+| ❌ 分子调用分子   | 必须通过调度层         |
+| ❌ 原子调用原子   | 必须通过分子层         |
+| ❌ 跨层直接调用   | L1不能直接调L3/L4    |
+| ❌ 反向调用     | L3不能调L2，L2不能调L1 |
+| ❌ UI层写业务逻辑 | UI层只负责交互        |
+| ❌ 调度层写业务逻辑 | 调度层只负责调度        |
+| ❌ 函数超过100行 | 必须拆分            |
+| ❌ 无类型注解    | 所有函数必须加         |
+| ❌ 无文档字符串   | 所有函数必须加         |
+
+***
+
+## 八、代码交付检查清单
+
+每次提交代码前，检查以下项目：
+
+- [ ] 明确标注所属层级（L1/L2/L3/L4）
+- [ ] 命名符合规范
+- [ ] 完整类型注解
+- [ ] 符合PEP8规范
+- [ ] 不违反分层依赖
+- [ ] 分子只调原子，不做全局决策
+- [ ] 调度只安排分子顺序
+- [ ] 测试通过
+
+## 九、参考文件
+
+- [ ] [(99+ 封私信 / 85 条消息) 为什么刚开始觉得ai编程很厉害，用久了就不行了？ - 知乎](https://www.zhihu.com/question/1954568431539036226/answer/1985967070765147448?share_code=gMSIduh4lzbC\&utm_psn=2033299764209526710)
+
+***
+
+**优先级：最高**
+**描述：QR标签生成器项目架构与编码规范**
+**始终应用：true**

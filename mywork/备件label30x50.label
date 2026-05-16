@@ -1,0 +1,73 @@
+{
+  "label_size": {
+    "width": 50,
+    "height": 30,
+    "corner_radius": 2
+  },
+  "dpi": 300,
+  "objects": [
+    {
+      "type": "qr",
+      "id": "13f5305b-5cce-4b0d-9a6f-f8b5bc485e66",
+      "position": {
+        "x": 0.0,
+        "y": 5.05
+      },
+      "size": {
+        "width": 25.0,
+        "height": 25.0
+      },
+      "properties": {
+        "qr_version": "25x25",
+        "error_correction": "H",
+        "content": "BF400725_C8-6",
+        "batch": true,
+        "csv_column": "hide_QRcode"
+      }
+    },
+    {
+      "type": "text",
+      "id": "e97847e8-a016-45ae-ba57-121de7e697cf",
+      "position": {
+        "x": 1.75,
+        "y": 0.79
+      },
+      "size": {
+        "width": 45.0,
+        "height": 7.0
+      },
+      "properties": {
+        "font": "Microsoft YaHei",
+        "font_size": 3.0,
+        "font_style": [
+          "bold"
+        ],
+        "color": "#000000",
+        "content": "BF400725_C8-6",
+        "batch": true,
+        "csv_column": "hide_QRcode"
+      }
+    },
+    {
+      "type": "text",
+      "id": "71470723-61b4-4a49-948d-06d1c011e872",
+      "position": {
+        "x": 22.814809081527347,
+        "y": 8.753199174406605
+      },
+      "size": {
+        "width": 24.0,
+        "height": 20.0
+      },
+      "properties": {
+        "font": "Microsoft YaHei",
+        "font_size": 2.1,
+        "font_style": [],
+        "color": "#000000",
+        "content": "电批；好帮手；ASA-BS6000扭力：0.20-1.50N.m（BS6000T)",
+        "batch": true,
+        "csv_column": "备件名称"
+      }
+    }
+  ]
+}
