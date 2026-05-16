@@ -4,46 +4,7 @@ on:
   workflow_dispatch:  # 仅手动触发
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    
-    steps:
-      - name: 拉取代码
-        uses: actions/checkout@v4
-
-      - name: 提取版本号
-        id: version
-        run: |
-          VERSION=$(grep "^VERSION" app_info.py | cut -d'"' -f2)
-          echo "当前版本号: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
-          # 检查版本号格式
-          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ 版本号格式不正确！应为 v1.2.3 格式"
-            exit 1
-          fi
-          
-          # 检查 tag 是否已存在
-          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
-            echo "❌ Tag $VERSION 已存在，请先删除或使用新版本号"
-            exit 1
-          fi
-          
-          echo "✅ 版本号验证通过: $VERSION"
-
-      - name: 创建 Git Tag
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag -a ${{ steps.version.outputs.version }} -m "Release ${{ steps.version.outputs.version }}"
-          git push origin ${{ steps.version.outputs.version }}
-          echo "✅ 已创建并推送 tag: ${{ steps.version.outputs.version }}"
-
   build:
-    needs: release
     runs-on: windows-latest
     
     steps:
@@ -57,6 +18,22 @@ jobs:
           architecture: "x64"
           cache: 'pip'
 
+      - name: 提取版本号
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(grep "^VERSION" app_info.py | cut -d'"' -f2)
+          echo "当前版本号: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # 检查版本号格式
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ 版本号格式不正确！应为 v1.2.3 格式"
+            exit 1
+          fi
+          
+          echo "✅ 版本号验证通过: $VERSION"
+
       - name: 安装依赖
         run: |
           python -m pip install --upgrade pip
@@ -67,23 +44,44 @@ jobs:
         run: |
           pyinstaller qr-label-creator.spec
 
+      - name: 检查打包结果
+        run: |
+          echo "检查 dist 目录:"
+          dir dist
+          if (-not (Test-Path "dist/qr-label-creator.exe")) {
+            echo "❌ EXE 文件未生成！"
+            exit 1
+          }
+
       - name: 创建 release 目录并重命名
         id: rename
         run: |
-          $VERSION = "${{ needs.release.outputs.version }}"
+          $VERSION = "${{ steps.version.outputs.version }}"
           New-Item -ItemType Directory -Path "release" -Force | Out-Null
           $NEW_NAME = "qr-label-creator-$VERSION.exe"
           Move-Item -Path "dist/qr-label-creator.exe" -Destination "release/$NEW_NAME"
           Write-Host "Created: $NEW_NAME"
           Write-Host "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "EXE_NAME=$NEW_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          
+          echo "检查 release 目录:"
+          dir release
+
+      - name: 创建 Git Tag
+        shell: bash
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a ${{ steps.version.outputs.version }} -m "Release ${{ steps.version.outputs.version }}"
+          git push origin ${{ steps.version.outputs.version }}
+          echo "✅ 已创建并推送 tag: ${{ steps.version.outputs.version }}"
 
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: release/${{ env.EXE_NAME }}
-          tag_name: ${{ needs.release.outputs.version }}
-          name: Release ${{ needs.release.outputs.version }}
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
