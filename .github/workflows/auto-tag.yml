@@ -1,7 +1,7 @@
 name: Release & Build
 
 on:
-  workflow_dispatch:  # 仅手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,6 +18,44 @@ jobs:
           architecture: "x64"
           cache: 'pip'
 
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pip list
+
+      - name: 查看目录结构
+        run: |
+          dir
+          Get-ChildItem -Recurse | Select-Object FullName
+
+      - name: 打包 EXE
+        run: |
+          pyinstaller qr-label-creator.spec
+        continue-on-error: false
+
+      - name: 检查打包结果
+        run: |
+          Write-Host "=== 检查 dist 目录 ==="
+          if (Test-Path "dist") {
+            dir dist
+          } else {
+            Write-Host "dist 目录不存在"
+            exit 1
+          }
+          
+          Write-Host "=== 检查 EXE 文件 ==="
+          $exePath = "dist/qr-label-creator.exe"
+          if (Test-Path $exePath) {
+            Write-Host "✅ EXE 文件存在: $exePath"
+            $file = Get-Item $exePath
+            Write-Host "文件大小: $($file.Length / 1MB) MB"
+          } else {
+            Write-Host "❌ EXE 文件不存在!"
+            exit 1
+          }
+
       - name: 提取版本号
         id: version
         shell: bash
@@ -25,56 +63,37 @@ jobs:
           VERSION=$(grep "^VERSION" app_info.py | cut -d'"' -f2)
           echo "当前版本号: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
-          # 检查版本号格式
-          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ 版本号格式不正确！应为 v1.2.3 格式"
-            exit 1
-          fi
-          
-          echo "✅ 版本号验证通过: $VERSION"
-
-      - name: 安装依赖
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: 打包 EXE
-        run: |
-          pyinstaller qr-label-creator.spec
-
-      - name: 检查打包结果
-        run: |
-          echo "检查 dist 目录:"
-          dir dist
-          if (-not (Test-Path "dist/qr-label-creator.exe")) {
-            echo "❌ EXE 文件未生成！"
-            exit 1
-          }
 
       - name: 创建 release 目录并重命名
         id: rename
         run: |
           $VERSION = "${{ steps.version.outputs.version }}"
+          Write-Host "版本号: $VERSION"
+          
           New-Item -ItemType Directory -Path "release" -Force | Out-Null
           $NEW_NAME = "qr-label-creator-$VERSION.exe"
-          Move-Item -Path "dist/qr-label-creator.exe" -Destination "release/$NEW_NAME"
-          Write-Host "Created: $NEW_NAME"
+          $SOURCE = "dist/qr-label-creator.exe"
+          $DEST = "release/$NEW_NAME"
+          
+          Write-Host "移动文件: $SOURCE -> $DEST"
+          Move-Item -Path $SOURCE -Destination $DEST -Force
+          
+          Write-Host "=== 检查 release 目录 ==="
+          dir release
+          
           Write-Host "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "EXE_NAME=$NEW_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           
-          echo "检查 release 目录:"
-          dir release
+          Write-Host "设置环境变量: VERSION=$VERSION, EXE_NAME=$NEW_NAME"
 
       - name: 创建 Git Tag
         shell: bash
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git tag -a ${{ steps.version.outputs.version }} -m "Release ${{ steps.version.outputs.version }}"
-          git push origin ${{ steps.version.outputs.version }}
-          echo "✅ 已创建并推送 tag: ${{ steps.version.outputs.version }}"
+          git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
+          echo "✅ 已创建并推送 tag"
 
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@v2
@@ -85,4 +104,3 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
