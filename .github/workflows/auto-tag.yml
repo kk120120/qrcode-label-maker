@@ -25,34 +25,14 @@ jobs:
           pip install pyinstaller
           pip list
 
-      - name: 查看目录结构
-        run: |
-          dir
-          Get-ChildItem -Recurse | Select-Object FullName
-
       - name: 打包 EXE
         run: |
           pyinstaller qr-label-creator.spec
-        continue-on-error: false
 
       - name: 检查打包结果
         run: |
-          Write-Host "=== 检查 dist 目录 ==="
-          if (Test-Path "dist") {
-            dir dist
-          } else {
-            Write-Host "dist 目录不存在"
-            exit 1
-          }
-          
-          Write-Host "=== 检查 EXE 文件 ==="
-          $exePath = "dist/qr-label-creator.exe"
-          if (Test-Path $exePath) {
-            Write-Host "✅ EXE 文件存在: $exePath"
-            $file = Get-Item $exePath
-            Write-Host "文件大小: $($file.Length / 1MB) MB"
-          } else {
-            Write-Host "❌ EXE 文件不存在!"
+          if (-not (Test-Path "dist/qr-label-creator.exe")) {
+            echo "❌ EXE 文件未生成!"
             exit 1
           }
 
@@ -61,30 +41,41 @@ jobs:
         shell: bash
         run: |
           VERSION=$(grep "^VERSION" app_info.py | cut -d'"' -f2)
-          echo "当前版本号: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: 创建 release 目录并重命名
-        id: rename
+      - name: 创建 releases 目录并打包
+        id: package
         run: |
           $VERSION = "${{ steps.version.outputs.version }}"
           Write-Host "版本号: $VERSION"
           
-          New-Item -ItemType Directory -Path "release" -Force | Out-Null
-          $NEW_NAME = "qr-label-creator-$VERSION.exe"
-          $SOURCE = "dist/qr-label-creator.exe"
-          $DEST = "release/$NEW_NAME"
+          $RELEASES_DIR = "releases/$VERSION"
+          New-Item -ItemType Directory -Path $RELEASES_DIR -Force | Out-Null
           
-          Write-Host "移动文件: $SOURCE -> $DEST"
-          Move-Item -Path $SOURCE -Destination $DEST -Force
+          $ZIP_NAME = "qr-label-creator-$VERSION.zip"
+          $ZIP_PATH = "$RELEASES_DIR/$ZIP_NAME"
           
-          Write-Host "=== 检查 release 目录 ==="
-          dir release
+          Compress-Archive -Path "dist/qr-label-creator.exe" -DestinationPath $ZIP_PATH -Force
+          Write-Host "创建 ZIP: $ZIP_PATH"
+          
+          Remove-Item -Path "dist/qr-label-creator.exe" -Force
+          Write-Host "已删除原始 EXE 文件"
+          
+          Write-Host "=== releases 目录结构 ==="
+          dir $RELEASES_DIR
           
           Write-Host "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host "EXE_NAME=$NEW_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          
-          Write-Host "设置环境变量: VERSION=$VERSION, EXE_NAME=$NEW_NAME"
+          Write-Host "ZIP_PATH=$ZIP_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "ZIP_NAME=$ZIP_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: 提交并推送 ZIP 文件
+        shell: bash
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add releases/
+          git commit -m "Add release ${{ steps.version.outputs.version }} artifacts"
+          git push origin HEAD:refs/heads/main
 
       - name: 创建 Git Tag
         shell: bash
@@ -93,12 +84,11 @@ jobs:
           git config user.email "actions@github.com"
           git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
           git push origin "${{ steps.version.outputs.version }}"
-          echo "✅ 已创建并推送 tag"
 
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/${{ env.EXE_NAME }}
+          files: ${{ env.ZIP_PATH }}
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           generate_release_notes: true
