@@ -1,0 +1,88 @@
+name: Release & Build
+
+on:
+  workflow_dispatch:  # 仅手动触发
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 提取版本号
+        id: version
+        run: |
+          VERSION=$(grep "^VERSION" app_info.py | cut -d'"' -f2)
+          echo "当前版本号: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # 检查版本号格式
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ 版本号格式不正确！应为 v1.2.3 格式"
+            exit 1
+          fi
+          
+          # 检查 tag 是否已存在
+          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "❌ Tag $VERSION 已存在，请先删除或使用新版本号"
+            exit 1
+          fi
+          
+          echo "✅ 版本号验证通过: $VERSION"
+
+      - name: 创建 Git Tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a ${{ steps.version.outputs.version }} -m "Release ${{ steps.version.outputs.version }}"
+          git push origin ${{ steps.version.outputs.version }}
+          echo "✅ 已创建并推送 tag: ${{ steps.version.outputs.version }}"
+
+  build:
+    needs: release
+    runs-on: windows-latest
+    
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: "x64"
+          cache: 'pip'
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 打包 EXE
+        run: |
+          pyinstaller qr-label-creator.spec
+
+      - name: 创建 release 目录并重命名
+        id: rename
+        run: |
+          $VERSION = (Select-String -Path "app_info.py" -Pattern "^VERSION").Line -replace ".*=\s*['""]*", "" -replace "['""]*$", ""
+          $VERSION = $VERSION.Trim()
+          New-Item -ItemType Directory -Path "release" -Force | Out-Null
+          $NEW_NAME = "qr-label-creator-$VERSION.exe"
+          Move-Item -Path "dist/qr-label-creator.exe" -Destination "release/$NEW_NAME"
+          Write-Host "Created: $NEW_NAME"
+          Write-Host "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "EXE_NAME=$NEW_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/${{ env.EXE_NAME }}
+          name: Release ${{ env.VERSION }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
