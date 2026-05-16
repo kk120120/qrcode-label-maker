@@ -27,12 +27,7 @@ from entry.ui_window.menu.menu_help import HelpMenu
 from entry.ui_window.menu.menu_history import HistoryMenu
 from entry.ui_window.designer_canvas import LabelDesigner
 
-
-VERSION = "v1.0.0"
-RELEASE_DATE = "2026-04-12"
-AUTHOR = "kk120120"
-EMAIL = "hzwtox@hotmail.com"
-GITHUB = "https://github.com/kk120120/qrcode-label-maker"
+from app_info import VERSION, RELEASE_DATE, AUTHOR, EMAIL, GITHUB
 
 
 class MainWindow(QMainWindow):

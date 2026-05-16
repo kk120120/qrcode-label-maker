@@ -69,6 +69,7 @@ UI层 → entry_ui.py (L1) → schedule_core.py (L2) → molecule_xxx.py (L3) �
 ### 第五步：更新文档（此步骤必须执行）
 1. 必须更新 `new_design.md` 记录变更
 2. 添加版本变更记录
+3. 更新 app_info.py 中的版本号
 
 ## 规则
 - 必须完整执行所有5个步骤，特别是第3步和第5步

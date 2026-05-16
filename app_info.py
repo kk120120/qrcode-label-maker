@@ -1,0 +1,5 @@
+VERSION = "v1.12.10"
+RELEASE_DATE = "2026-05-15"
+AUTHOR = "kk120120"
+EMAIL = "hzwtox@hotmail.com"
+GITHUB = "https://github.com/kk120120/qrcode-label-maker"

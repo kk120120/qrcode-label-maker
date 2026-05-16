@@ -1,0 +1,35 @@
+#powershell 已安装 git 和 cli
+# 进入 temp_repo 上级目录
+
+# 设置 HTTP/HTTPS 代理（端口根据你的代理软件调整）
+# 常见代理端口：Clash 7890、V2Ray 10809、SSR 1080
+
+git config --global http.proxy http://127.0.0.1:7890
+git config --global https.proxy http://127.0.0.1:7890
+
+#如果不需要代理时取消设置
+git config --global --unset http.proxy
+git config --global --unset https.proxy
+
+# 使用 HTTPS 地址克隆（配合你的 PAT）
+git clone https://github.com/kk120120/qrcode-label-maker.git temp_repo
+
+cd temp_repo
+# 2. 切换到 rework-trae 分支
+git checkout rework-trae
+git pull origin rework-trae
+
+# 3. 清空所有文件（workflow 因权限自动保留）
+git rm -r --cached .
+
+# 4. 复制本地所有文件到仓库
+Copy-Item -Path D:\work_qr\* -Destination . -Recurse -Force -Exclude "temp_repo"
+
+# 5. 提交并强制推送
+git add .
+git commit -m "完全重置分支：覆盖为 D:\work_qr 的全部内容"
+git push origin rework-trae --force
+
+# 6. 清理临时文件
+cd D:\work_qr
+Remove-Item -Recurse -Force temp_repo

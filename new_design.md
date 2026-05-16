@@ -1635,6 +1635,18 @@ from schedule.schedule_core import CoreScheduler
 
 ## 14. 版本变更记录
 
+### v1.12.11 (2026-05-16)
+- **代码清理**：删除调试输出代码
+- **修改内容**：
+  1. 删除 `app.log` 日志文件
+  2. 删除 `main.py` 中的 `logging` 模块导入
+  3. 删除 `logging.basicConfig()` 配置代码（FileHandler 输出到 app.log）
+  4. 删除 main.py 中的调试 print 语句（保留错误提示）
+  5. 将 `logger.info()` 和 `logger.error()` 替换为 `print()`
+- **修改文件**：
+  - 删除 `app.log` - 日志文件
+  - 更新 `main.py` - 删除调试 print 语句，仅保留错误提示
+
 ### v1.12.10 (2026-05-15)
 - **UI优化**：调整属性面板显示宽度
 - **修改内容**：
