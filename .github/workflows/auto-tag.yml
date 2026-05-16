@@ -6,6 +6,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     
     steps:
       - name: 拉取代码
@@ -68,8 +70,7 @@ jobs:
       - name: 创建 release 目录并重命名
         id: rename
         run: |
-          $VERSION = (Select-String -Path "app_info.py" -Pattern "^VERSION").Line -replace ".*=\s*['""]*", "" -replace "['""]*$", ""
-          $VERSION = $VERSION.Trim()
+          $VERSION = "${{ needs.release.outputs.version }}"
           New-Item -ItemType Directory -Path "release" -Force | Out-Null
           $NEW_NAME = "qr-label-creator-$VERSION.exe"
           Move-Item -Path "dist/qr-label-creator.exe" -Destination "release/$NEW_NAME"
@@ -81,7 +82,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release/${{ env.EXE_NAME }}
-          name: Release ${{ env.VERSION }}
+          tag_name: ${{ needs.release.outputs.version }}
+          name: Release ${{ needs.release.outputs.version }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
